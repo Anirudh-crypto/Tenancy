@@ -66,7 +66,10 @@ function useProtectedRoute() {
   useEffect(() => {
     if (!hydrated) return;
     const inAuthGroup =
-      segments[0] === 'login' || segments[0] === 'signup' || segments[0] === 'verify';
+      segments[0] === 'login' ||
+      segments[0] === 'signup' ||
+      segments[0] === 'verify' ||
+      segments[0] === 'reset-password';
 
     if (!user && !inAuthGroup) {
       router.replace('/login');
@@ -198,6 +201,7 @@ export default function RootLayout() {
               <Stack.Screen name="login" options={{ headerShown: false }} />
               <Stack.Screen name="signup" options={{ headerShown: false }} />
               <Stack.Screen name="verify" options={{ headerShown: false }} />
+              <Stack.Screen name="reset-password" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen
                 name="ticket/new"

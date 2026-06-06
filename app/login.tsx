@@ -105,6 +105,16 @@ export default function LoginScreen() {
                   </Text>
                 </Button>
 
+                <View className="items-center">
+                  <Text
+                    size="sm"
+                    weight="medium"
+                    className="text-primary"
+                    onPress={() => router.push('/reset-password')}>
+                    Forgot password?
+                  </Text>
+                </View>
+
                 <View className="flex-row items-center justify-center gap-1">
                   <Text size="sm" variant="muted">
                     No account yet?

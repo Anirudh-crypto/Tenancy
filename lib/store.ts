@@ -123,6 +123,14 @@ interface State {
     token: string
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
   resendSignupCode: (email: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  requestPasswordReset: (
+    email: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  verifyPasswordReset: (
+    email: string,
+    token: string,
+    newPassword: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   signOut: () => Promise<void>;
 
   setRole: (r: 'tenant' | 'landlord') => void;
@@ -253,6 +261,41 @@ export const useStore = create<State>()(
         const normalized = email.trim().toLowerCase();
         const { error } = await supabase.auth.resend({ type: 'signup', email: normalized });
         if (error) return { ok: false, error: error.message };
+        return { ok: true };
+      },
+
+      requestPasswordReset: async (email) => {
+        const normalized = email.trim().toLowerCase();
+        if (!normalized.includes('@')) {
+          return { ok: false, error: 'Enter a valid email address.' };
+        }
+        // Sends a 6-digit recovery code (no redirect link).
+        const { error } = await supabase.auth.resetPasswordForEmail(normalized);
+        if (error) return { ok: false, error: error.message };
+        return { ok: true };
+      },
+
+      verifyPasswordReset: async (email, token, newPassword) => {
+        const normalized = email.trim().toLowerCase();
+        if (newPassword.length < 6) {
+          return { ok: false, error: 'Password must be at least 6 characters.' };
+        }
+        const { data, error } = await supabase.auth.verifyOtp({
+          email: normalized,
+          token: token.trim(),
+          type: 'recovery',
+        });
+        if (error || !data.user) {
+          return { ok: false, error: error?.message ?? 'Invalid or expired code.' };
+        }
+        const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+        if (updateError) {
+          return { ok: false, error: updateError.message };
+        }
+        const profile = await fetchProfile(data.user.id);
+        if (profile) {
+          set({ user: profile, role: profile.role });
+        }
         return { ok: true };
       },
 
