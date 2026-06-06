@@ -58,40 +58,26 @@ export default function LoginScreen() {
                   Sign in
                 </Text>
 
-                <View className="gap-1.5">
-                  <Text size="sm" weight="medium">
-                    Email
-                  </Text>
-                  <View className="flex-row items-center gap-2 rounded-md border border-input bg-background px-3">
-                    <Mail size={18} className="text-muted-foreground" />
-                    <Input
-                      className="flex-1 border-0 px-0"
-                      placeholder="you@example.com"
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                      autoComplete="email"
-                      value={email}
-                      onChangeText={setEmail}
-                    />
-                  </View>
-                </View>
+                <Input
+                  label="Email"
+                  leftIcon={<Mail size={18} className="text-muted-foreground" />}
+                  placeholder="you@example.com"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  value={email}
+                  onChangeText={setEmail}
+                />
 
-                <View className="gap-1.5">
-                  <Text size="sm" weight="medium">
-                    Password
-                  </Text>
-                  <View className="flex-row items-center gap-2 rounded-md border border-input bg-background px-3">
-                    <Lock size={18} className="text-muted-foreground" />
-                    <Input
-                      className="flex-1 border-0 px-0"
-                      placeholder="••••••••"
-                      secureTextEntry
-                      autoComplete="password"
-                      value={password}
-                      onChangeText={setPassword}
-                    />
-                  </View>
-                </View>
+                <Input
+                  label="Password"
+                  leftIcon={<Lock size={18} className="text-muted-foreground" />}
+                  placeholder="••••••••"
+                  secureTextEntry
+                  autoComplete="password"
+                  value={password}
+                  onChangeText={setPassword}
+                />
 
                 {error ? (
                   <Text size="sm" className="text-destructive">

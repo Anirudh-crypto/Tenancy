@@ -89,6 +89,7 @@ export const Input = React.forwardRef<TextInput, InputProps>(
             onFocus={handleFocus}
             onBlur={handleBlur}
             accessibilityLabel={label}
+            selectionColor="hsl(240, 5.9%, 10%)"
             {...props}
           />
           {rightIcon && <View className="ml-2">{rightIcon}</View>}
