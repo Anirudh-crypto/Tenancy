@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { router } from 'expo-router';
-import { ClipboardCheck, FileCheck2, Home, LogOut } from 'lucide-react-native';
+import { ClipboardCheck, FileCheck2, Home, Lock, LogOut } from 'lucide-react-native';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,6 +11,7 @@ import type { InspectionKind } from '@/lib/types';
 export default function InspectScreen() {
   const inspections = useStore((s) => s.inspections);
   const createInspection = useStore((s) => s.createInspection);
+  const role = useStore((s) => s.role);
 
   const start = (kind: InspectionKind) => {
     const id = createInspection(kind);
@@ -28,19 +29,35 @@ export default function InspectScreen() {
         </Text>
 
         <View className="mt-5 gap-3">
-          <Card pressable onPress={() => start('move_in')}>
-            <View className="flex-row items-center gap-3 p-4">
-              <View className="h-11 w-11 items-center justify-center rounded-full bg-primary/10">
-                <Home size={22} className="text-primary" />
+          {role === 'landlord' ? (
+            <Card>
+              <View className="flex-row items-center gap-3 p-4 opacity-60">
+                <View className="h-11 w-11 items-center justify-center rounded-full bg-muted">
+                  <Lock size={20} className="text-muted-foreground" />
+                </View>
+                <View className="flex-1">
+                  <Text weight="semibold">Move-in report (tenant-led)</Text>
+                  <Text size="xs" variant="muted">
+                    Tenants capture move-in photos. You can review their signed reports below.
+                  </Text>
+                </View>
               </View>
-              <View className="flex-1">
-                <Text weight="semibold">New move-in report</Text>
-                <Text size="xs" variant="muted">
-                  Document existing damage before you move in
-                </Text>
+            </Card>
+          ) : (
+            <Card pressable onPress={() => start('move_in')}>
+              <View className="flex-row items-center gap-3 p-4">
+                <View className="h-11 w-11 items-center justify-center rounded-full bg-primary/10">
+                  <Home size={22} className="text-primary" />
+                </View>
+                <View className="flex-1">
+                  <Text weight="semibold">New move-in report</Text>
+                  <Text size="xs" variant="muted">
+                    Document existing damage before you move in
+                  </Text>
+                </View>
               </View>
-            </View>
-          </Card>
+            </Card>
+          )}
           <Card pressable onPress={() => start('move_out')}>
             <View className="flex-row items-center gap-3 p-4">
               <View className="h-11 w-11 items-center justify-center rounded-full bg-accent/15">

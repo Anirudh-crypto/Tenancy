@@ -1,14 +1,16 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
+  ArrowLeft,
   Camera,
   CheckCircle2,
   FileSignature,
   Loader2,
+  Lock,
   ScanSearch,
   Wallet,
 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -67,9 +69,12 @@ export default function InspectionDetailScreen() {
 
   const isMoveOut = inspection.kind === 'move_out';
   const capturedRooms = new Set(inspection.photos.map((p) => p.room));
+  // Move-in documentation is the tenant's responsibility (so they can prove
+  // pre-existing damage). Landlords get a read-only view of move-in reports.
+  const canCapture = !(inspection.kind === 'move_in' && role === 'landlord');
 
   const capture = (room: RoomKey) => {
-    if (scanningRoom) return;
+    if (scanningRoom || !canCapture) return;
     setScanningRoom(room);
     // Simulate camera + on-device AI vision pass
     setTimeout(() => {
@@ -90,6 +95,21 @@ export default function InspectionDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
+      <Stack.Screen
+        options={{
+          title: isMoveOut ? 'Move-out report' : 'Move-in report',
+          headerLeft: () => (
+            <Pressable
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/inspect'))}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              className="min-h-[44px] min-w-[44px] flex-row items-center justify-center pr-2">
+              <ArrowLeft size={22} className="text-foreground" />
+            </Pressable>
+          ),
+        }}
+      />
       <ScrollView contentContainerClassName="px-5 pb-10 pt-4" showsVerticalScrollIndicator={false}>
         <Text size="xl" weight="bold">
           {isMoveOut ? 'Move-out report' : 'Move-in report'}
@@ -98,8 +118,23 @@ export default function InspectionDetailScreen() {
           {property.name} · {property.address}
         </Text>
 
+        {!canCapture ? (
+          <View className="mt-4 flex-row items-start gap-2.5 rounded-md border border-border bg-muted/50 p-3.5">
+            <Lock size={18} className="text-muted-foreground" />
+            <View className="flex-1">
+              <Text size="sm" weight="semibold">
+                Read-only view
+              </Text>
+              <Text size="xs" variant="muted">
+                Move-in documentation is captured by the tenant so pre-existing damage is recorded
+                from their side. You can review findings and the signed report here.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         <Text size="sm" weight="semibold" variant="muted" className="mb-2 mt-5">
-          CAPTURE EACH ROOM
+          {canCapture ? 'CAPTURE EACH ROOM' : 'ROOMS'}
         </Text>
         <View className="gap-2.5">
           {ROOMS.map((r) => {
@@ -123,37 +158,41 @@ export default function InspectionDetailScreen() {
                     <Text size="xs" variant="muted">
                       {done
                         ? `${inspection.photos.filter((p) => p.room === r.key).length} photo(s) analyzed`
-                        : 'Not captured'}
+                        : canCapture
+                          ? 'Not captured'
+                          : 'Awaiting tenant capture'}
                     </Text>
                   </View>
-                  <Button
-                    size="sm"
-                    variant={done ? 'outline' : 'default'}
-                    disabled={scanning}
-                    onPress={() => capture(r.key)}>
-                    {scanning ? (
-                      <View className="flex-row items-center gap-1.5">
-                        <Scanner />
-                        <Text size="xs" weight="semibold">
-                          Scanning
-                        </Text>
-                      </View>
-                    ) : (
-                      <View className="flex-row items-center gap-1.5">
-                        <ScanSearch
-                          size={14}
-                          color={done ? undefined : '#fff'}
-                          className={done ? 'text-foreground' : undefined}
-                        />
-                        <Text
-                          size="xs"
-                          weight="semibold"
-                          className={done ? 'text-foreground' : 'text-primary-foreground'}>
-                          {done ? 'Re-scan' : 'Capture'}
-                        </Text>
-                      </View>
-                    )}
-                  </Button>
+                  {canCapture ? (
+                    <Button
+                      size="sm"
+                      variant={done ? 'outline' : 'default'}
+                      disabled={scanning}
+                      onPress={() => capture(r.key)}>
+                      {scanning ? (
+                        <View className="flex-row items-center gap-1.5">
+                          <Scanner />
+                          <Text size="xs" weight="semibold">
+                            Scanning
+                          </Text>
+                        </View>
+                      ) : (
+                        <View className="flex-row items-center gap-1.5">
+                          <ScanSearch
+                            size={14}
+                            color={done ? undefined : '#fff'}
+                            className={done ? 'text-foreground' : undefined}
+                          />
+                          <Text
+                            size="xs"
+                            weight="semibold"
+                            className={done ? 'text-foreground' : 'text-primary-foreground'}>
+                            {done ? 'Re-scan' : 'Capture'}
+                          </Text>
+                        </View>
+                      )}
+                    </Button>
+                  ) : null}
                 </View>
               </Card>
             );
@@ -236,7 +275,7 @@ export default function InspectionDetailScreen() {
               Signed by {inspection.signedBy}
             </Text>
           </View>
-        ) : (
+        ) : canCapture ? (
           <Button
             className="mt-6"
             size="lg"
@@ -252,8 +291,15 @@ export default function InspectionDetailScreen() {
               </Text>
             </View>
           </Button>
+        ) : (
+          <View className="mt-6 flex-row items-center justify-center gap-2 rounded-md bg-muted py-3">
+            <Lock size={16} className="text-muted-foreground" />
+            <Text size="sm" variant="muted">
+              Awaiting tenant signature
+            </Text>
+          </View>
         )}
-        {inspection.photos.length === 0 ? (
+        {canCapture && inspection.photos.length === 0 ? (
           <Text size="xs" variant="muted" className="mt-2 text-center">
             Capture at least one room to sign.
           </Text>
