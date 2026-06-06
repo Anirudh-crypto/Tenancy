@@ -43,3 +43,35 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
   if (error || !data) return null;
   return data as Profile;
 }
+
+/**
+ * Returns the profile for the currently authenticated user, creating it from the
+ * auth user's metadata if the row is missing. This makes sign-in resilient when
+ * the `on_auth_user_created` trigger didn't fire (e.g. user created before the
+ * trigger existed), instead of leaving the app stuck on the login screen.
+ */
+export async function ensureProfile(): Promise<Profile | null> {
+  const { data: userData } = await supabase.auth.getUser();
+  const authUser = userData.user;
+  if (!authUser) return null;
+
+  const existing = await fetchProfile(authUser.id);
+  if (existing) return existing;
+
+  const meta = (authUser.user_metadata ?? {}) as { name?: string; role?: string };
+  const role: Profile['role'] = meta.role === 'landlord' ? 'landlord' : 'tenant';
+  const profile: Profile = {
+    id: authUser.id,
+    email: authUser.email ?? '',
+    name: meta.name ?? '',
+    role,
+  };
+
+  const { error } = await supabase.from('profiles').upsert(profile, { onConflict: 'id' });
+  if (error) {
+    // Even if the insert fails (e.g. transient), return the in-memory profile so
+    // the user can proceed rather than being bounced back to login.
+    return profile;
+  }
+  return (await fetchProfile(authUser.id)) ?? profile;
+}

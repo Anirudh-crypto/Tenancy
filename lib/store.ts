@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { genId, triageTicket } from './ai';
-import { fetchProfile, supabase } from './supabase';
+import { ensureProfile, fetchProfile, supabase } from './supabase';
 import type {
   DetectedDamage,
   Inspection,
@@ -176,7 +176,7 @@ export const useStore = create<State>()(
           const { data } = await supabase.auth.getSession();
           const session = data.session;
           if (session?.user) {
-            const profile = await fetchProfile(session.user.id);
+            const profile = await ensureProfile();
             if (profile) {
               set({ user: profile, role: profile.role });
             }
@@ -194,7 +194,7 @@ export const useStore = create<State>()(
             return;
           }
           void (async () => {
-            const profile = await fetchProfile(session.user.id);
+            const profile = await ensureProfile();
             if (profile) set({ user: profile, role: profile.role });
           })();
         });
@@ -209,10 +209,11 @@ export const useStore = create<State>()(
         if (error || !data.user) {
           return { ok: false, error: error?.message ?? 'Invalid email or password.' };
         }
-        const profile = await fetchProfile(data.user.id);
-        if (profile) {
-          set({ user: profile, role: profile.role });
+        const profile = await ensureProfile();
+        if (!profile) {
+          return { ok: false, error: 'Could not load your profile. Please try again.' };
         }
+        set({ user: profile, role: profile.role });
         return { ok: true };
       },
 
@@ -250,7 +251,7 @@ export const useStore = create<State>()(
         if (error || !data.user) {
           return { ok: false, error: error?.message ?? 'Invalid or expired code.' };
         }
-        const profile = await fetchProfile(data.user.id);
+        const profile = await ensureProfile();
         if (profile) {
           set({ user: profile, role: profile.role });
         }

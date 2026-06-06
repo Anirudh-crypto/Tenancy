@@ -27,7 +27,7 @@ export default function LoginScreen() {
       return;
     }
     toast({ title: 'Welcome back', variant: 'success' });
-    router.replace('/(tabs)');
+    // Navigation is handled by the auth guard in app/_layout.tsx once `user` is set.
   };
 
   return (
