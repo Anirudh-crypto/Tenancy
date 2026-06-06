@@ -65,7 +65,8 @@ function useProtectedRoute() {
 
   useEffect(() => {
     if (!hydrated) return;
-    const inAuthGroup = segments[0] === 'login' || segments[0] === 'signup';
+    const inAuthGroup =
+      segments[0] === 'login' || segments[0] === 'signup' || segments[0] === 'verify';
 
     if (!user && !inAuthGroup) {
       router.replace('/login');
@@ -77,7 +78,12 @@ function useProtectedRoute() {
 
 export default function RootLayout() {
   const { colorScheme, setColorScheme } = useColorScheme();
+  const initAuth = useStore((s) => s.initAuth);
   useProtectedRoute();
+
+  useEffect(() => {
+    void initAuth();
+  }, [initAuth]);
 
   const [loaded, error] = useFonts({
     Inter_400Regular,
@@ -191,6 +197,7 @@ export default function RootLayout() {
             <Stack>
               <Stack.Screen name="login" options={{ headerShown: false }} />
               <Stack.Screen name="signup" options={{ headerShown: false }} />
+              <Stack.Screen name="verify" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen
                 name="ticket/new"

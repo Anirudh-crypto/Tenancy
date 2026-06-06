@@ -3,8 +3,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { genId, triageTicket } from './ai';
+import { fetchProfile, supabase } from './supabase';
 import type {
-  Account,
   DetectedDamage,
   Inspection,
   InspectionKind,
@@ -96,23 +96,6 @@ const SEED_RISKS: RiskSignal[] = [
   },
 ];
 
-const SEED_ACCOUNTS: Account[] = [
-  {
-    id: 'acc_tenant',
-    email: 'lena@tenant.de',
-    password: 'password',
-    name: 'Lena Hoffmann',
-    role: 'tenant',
-  },
-  {
-    id: 'acc_landlord',
-    email: 'becker@landlord.de',
-    password: 'password',
-    name: 'M. Becker Immobilien',
-    role: 'landlord',
-  },
-];
-
 interface State {
   property: Property;
   tickets: Ticket[];
@@ -122,17 +105,25 @@ interface State {
   role: 'tenant' | 'landlord';
   hydrated: boolean;
 
-  accounts: Account[];
   user: User | null;
 
-  signIn: (email: string, password: string) => { ok: true } | { ok: false; error: string };
+  initAuth: () => Promise<void>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   signUp: (input: {
     name: string;
     email: string;
     password: string;
     role: Role;
-  }) => { ok: true } | { ok: false; error: string };
-  signOut: () => void;
+  }) => Promise<{ ok: true; needsVerification: boolean } | { ok: false; error: string }>;
+  verifySignup: (
+    email: string,
+    token: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  resendSignupCode: (email: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  signOut: () => Promise<void>;
 
   setRole: (r: 'tenant' | 'landlord') => void;
   addTicket: (input: { title: string; description: string }) => Ticket;
@@ -170,43 +161,105 @@ export const useStore = create<State>()(
       role: 'tenant',
       hydrated: false,
 
-      accounts: SEED_ACCOUNTS,
       user: null,
 
-      signIn: (email, password) => {
-        const normalized = email.trim().toLowerCase();
-        const account = get().accounts.find((a) => a.email.toLowerCase() === normalized);
-        if (!account || account.password !== password) {
-          return { ok: false, error: 'Invalid email or password.' };
+      initAuth: async () => {
+        try {
+          const { data } = await supabase.auth.getSession();
+          const session = data.session;
+          if (session?.user) {
+            const profile = await fetchProfile(session.user.id);
+            if (profile) {
+              set({ user: profile, role: profile.role });
+            }
+          }
+        } catch {
+          // ignore — treated as signed out
+        } finally {
+          set({ hydrated: true });
         }
-        const { password: _pw, ...user } = account;
-        set({ user, role: account.role });
+
+        // Keep store in sync with auth state changes (token refresh, sign out, etc.)
+        supabase.auth.onAuthStateChange((_event, session) => {
+          if (!session?.user) {
+            set({ user: null });
+            return;
+          }
+          void (async () => {
+            const profile = await fetchProfile(session.user.id);
+            if (profile) set({ user: profile, role: profile.role });
+          })();
+        });
+      },
+
+      signIn: async (email, password) => {
+        const normalized = email.trim().toLowerCase();
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: normalized,
+          password,
+        });
+        if (error || !data.user) {
+          return { ok: false, error: error?.message ?? 'Invalid email or password.' };
+        }
+        const profile = await fetchProfile(data.user.id);
+        if (profile) {
+          set({ user: profile, role: profile.role });
+        }
         return { ok: true };
       },
 
-      signUp: ({ name, email, password, role }) => {
+      signUp: async ({ name, email, password, role }) => {
         const normalized = email.trim().toLowerCase();
         if (!name.trim()) return { ok: false, error: 'Please enter your name.' };
         if (!normalized.includes('@')) return { ok: false, error: 'Enter a valid email address.' };
         if (password.length < 6) {
           return { ok: false, error: 'Password must be at least 6 characters.' };
         }
-        if (get().accounts.some((a) => a.email.toLowerCase() === normalized)) {
-          return { ok: false, error: 'An account with this email already exists.' };
-        }
-        const account: Account = {
-          id: genId('acc'),
+        const { data, error } = await supabase.auth.signUp({
           email: normalized,
           password,
-          name: name.trim(),
-          role,
-        };
-        const { password: _pw, ...user } = account;
-        set((s) => ({ accounts: [...s.accounts, account], user, role }));
+          options: { data: { name: name.trim(), role } },
+        });
+        if (error) {
+          return { ok: false, error: error.message };
+        }
+        // If email confirmation is required, there is no active session yet.
+        const needsVerification = !data.session;
+        if (data.session && data.user) {
+          const profile = await fetchProfile(data.user.id);
+          if (profile) set({ user: profile, role: profile.role });
+        }
+        return { ok: true, needsVerification };
+      },
+
+      verifySignup: async (email, token) => {
+        const normalized = email.trim().toLowerCase();
+        const { data, error } = await supabase.auth.verifyOtp({
+          email: normalized,
+          token: token.trim(),
+          type: 'signup',
+        });
+        if (error || !data.user) {
+          return { ok: false, error: error?.message ?? 'Invalid or expired code.' };
+        }
+        const profile = await fetchProfile(data.user.id);
+        if (profile) {
+          set({ user: profile, role: profile.role });
+        }
         return { ok: true };
       },
 
-      signOut: () => set({ user: null }),
+      resendSignupCode: async (email) => {
+        const normalized = email.trim().toLowerCase();
+        const { error } = await supabase.auth.resend({ type: 'signup', email: normalized });
+        if (error) return { ok: false, error: error.message };
+        return { ok: true };
+      },
+
+      signOut: async () => {
+        await supabase.auth.signOut();
+        set({ user: null });
+      },
 
       setRole: (role) => set({ role }),
 
@@ -323,13 +376,9 @@ export const useStore = create<State>()(
         timeline: s.timeline,
         inspections: s.inspections,
         risks: s.risks,
-        role: s.role,
-        accounts: s.accounts,
-        user: s.user,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setRole(state.role);
-        useStore.setState({ hydrated: true });
+      onRehydrateStorage: () => () => {
+        // Auth hydration (and the `hydrated` flag) is owned by initAuth() in _layout.
       },
     }
   )

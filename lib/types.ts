@@ -1,14 +1,11 @@
 export type Role = 'tenant' | 'landlord';
 
-export interface Account {
+export interface User {
   id: string;
   email: string;
-  password: string; // mock only — plaintext, never do this in production
   name: string;
   role: Role;
 }
-
-export type User = Omit<Account, 'password'>;
 
 export type Urgency = 'emergency' | 'high' | 'medium' | 'low';
 export type TicketStatus = 'open' | 'acknowledged' | 'in_progress' | 'resolved';

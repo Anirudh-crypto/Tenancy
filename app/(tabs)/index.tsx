@@ -90,7 +90,7 @@ export default function HomeScreen() {
             size="icon"
             accessibilityLabel="Sign out"
             onPress={() => {
-              signOut();
+              void signOut();
               router.replace('/login');
             }}>
             <LogOut size={20} className="text-muted-foreground" />

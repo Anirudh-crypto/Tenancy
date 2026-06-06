@@ -24,12 +24,20 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('tenant');
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     setError(null);
-    const result = signUp({ name, email, password, role });
+    setSubmitting(true);
+    const result = await signUp({ name, email, password, role });
+    setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
+      return;
+    }
+    if (result.needsVerification) {
+      toast({ title: 'Check your email for a code', variant: 'success' });
+      router.push({ pathname: '/verify', params: { email: email.trim().toLowerCase() } });
       return;
     }
     toast({ title: 'Account created', variant: 'success' });
@@ -139,9 +147,9 @@ export default function SignUpScreen() {
                   </Text>
                 ) : null}
 
-                <Button onPress={onSubmit} className="mt-1 h-12">
+                <Button onPress={() => void onSubmit()} disabled={submitting} className="mt-1 h-12">
                   <Text weight="semibold" className="text-primary-foreground">
-                    Create account
+                    {submitting ? 'Creating…' : 'Create account'}
                   </Text>
                 </Button>
 
