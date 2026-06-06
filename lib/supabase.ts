@@ -214,7 +214,7 @@ export async function fetchPropertyById(id: string): Promise<Property | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Invite codes: a landlord generates a single-use code for a property; a tenant
+// Invite IDs: a landlord generates a single-use ID for a property; a tenant
 // redeems it during signup to be linked to that property.
 // ---------------------------------------------------------------------------
 
@@ -334,7 +334,7 @@ export async function redeemInvite(
   const { data, error } = await supabase.rpc('redeem_invite', { p_code: code.trim() });
   if (error) {
     const msg = /invalid_code/.test(error.message)
-      ? 'That invite code is invalid or has already been used.'
+      ? 'That invite ID is invalid or has already been used.'
       : error.message;
     return { ok: false, error: msg };
   }

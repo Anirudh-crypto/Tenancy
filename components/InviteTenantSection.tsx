@@ -9,8 +9,8 @@ import { useStore } from '@/lib/store';
 import type { Property } from '@/lib/types';
 
 /**
- * Landlord-only section: generate a single-use invite code for a property and
- * share it with a tenant. The tenant redeems the code during signup.
+ * Landlord-only section: generate a single-use invite ID for a property and
+ * share it with a tenant. The tenant redeems the ID during signup.
  */
 export function InviteTenantSection({ property }: { property: Property }) {
   const invites = useStore((s) => s.invites);
@@ -30,21 +30,25 @@ export function InviteTenantSection({ property }: { property: Property }) {
   const onGenerate = async () => {
     const result = await generateInvite(property.id);
     if (!result.ok) {
-      toast({ title: 'Could not create code', description: result.error, variant: 'destructive' });
+      toast({
+        title: 'Could not create invite ID',
+        description: result.error,
+        variant: 'destructive',
+      });
       return;
     }
-    toast({ title: 'Invite code created', variant: 'success' });
+    toast({ title: 'Invite ID created', variant: 'success' });
   };
 
   const onCopy = async (code: string) => {
     await Clipboard.setStringAsync(code);
-    toast({ title: 'Code copied', variant: 'success' });
+    toast({ title: 'Invite ID copied', variant: 'success' });
   };
 
   const onShare = async (code: string) => {
     try {
       await Share.share({
-        message: `You've been invited to ${property.name} on TenancyOS.\n\nYour invite code: ${code}\n\nDownload the app, choose "Tenant", and enter this code to set up your account.`,
+        message: `You've been invited to ${property.name} on TenancyOS.\n\nYour invite ID: ${code}\n\nDownload the app, choose "Tenant", and enter this ID to set up your account.`,
       });
     } catch {
       // user dismissed the share sheet — no-op
@@ -69,7 +73,7 @@ export function InviteTenantSection({ property }: { property: Property }) {
           <View className="flex-row items-center gap-2">
             <TicketIcon size={16} className="text-primary" />
             <Text size="sm" variant="muted" className="flex-1">
-              Generate a single-use code and share it with your tenant. They redeem it when they
+              Generate a single-use invite ID and share it with your tenant. They redeem it when they
               create their account.
             </Text>
           </View>
@@ -78,14 +82,14 @@ export function InviteTenantSection({ property }: { property: Property }) {
             <View className="flex-row items-center gap-2">
               <Plus size={18} className="text-primary-foreground" />
               <Text weight="semibold" className="text-primary-foreground">
-                Generate invite code
+                Generate invite ID
               </Text>
             </View>
           </Button>
 
           {invitesLoading && invites.length === 0 ? (
             <Text size="sm" variant="muted">
-              Loading codes…
+              Loading invite IDs…
             </Text>
           ) : null}
 
@@ -127,7 +131,7 @@ export function InviteTenantSection({ property }: { property: Property }) {
                   </View>
                 </Button>
                 <Pressable
-                  accessibilityLabel="Revoke code"
+                  accessibilityLabel="Revoke invite ID"
                   hitSlop={8}
                   onPress={() => void revokeInvite(invite.id)}
                   className="min-h-[44px] min-w-[44px] items-center justify-center">
@@ -141,7 +145,7 @@ export function InviteTenantSection({ property }: { property: Property }) {
             <>
               <Separator />
               <Text size="xs" weight="semibold" variant="muted">
-                PAST CODES
+                PAST INVITES
               </Text>
               {usedInvites.map((invite) => (
                 <View

@@ -86,6 +86,12 @@ npx expo start
 
 Then scan the QR code with Expo Go.
 
+## Supabase invite-only tenant signup
+
+Tenant accounts are invite-only. A landlord opens a property, generates a single-use invite ID, and shares it with the tenant. The tenant signs up with that invite ID plus a username and password; redemption links the tenant profile to that property only.
+
+Apply the migration in `supabase/migrations/20260606170000_invite_tenant_signup.sql` to create the `property_invites` table, invite preview/redemption RPCs, tenant property linking, and property-scoped RLS policies.
+
 ## How can I deploy this project?
 
 Go to your [Bilt Project](https://app.bilt.me/agent/1565044b-65fb-42da-96e7-06aa10efeeed), after that go to Settings -> App Store.

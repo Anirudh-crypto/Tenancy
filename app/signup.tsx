@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 type Mode = 'tenant' | 'landlord';
 
 const MODE_OPTIONS: { mode: Mode; title: string; sub: string; icon: typeof Home }[] = [
-  { mode: 'tenant', title: 'Tenant', sub: 'I have an invite code', icon: KeyRound },
+  { mode: 'tenant', title: 'Tenant', sub: 'I have an invite ID', icon: KeyRound },
   { mode: 'landlord', title: 'Landlord', sub: 'I manage properties', icon: Home },
 ];
 
@@ -47,7 +47,7 @@ export default function SignUpScreen() {
     setCheckingCode(false);
     if (!result) {
       setPreview(null);
-      setError('That invite code is invalid or has already been used.');
+      setError('That invite ID is invalid or has already been used.');
       return;
     }
     setPreview(result);
@@ -120,7 +120,7 @@ export default function SignUpScreen() {
                 {mode === 'tenant' ? (
                   <>
                     <Input
-                      label="Invite code"
+                      label="Invite ID"
                       leftIcon={<TicketIcon size={18} className="text-muted-foreground" />}
                       placeholder="e.g. BERL-7K2Q"
                       autoCapitalize="characters"
@@ -146,8 +146,8 @@ export default function SignUpScreen() {
                     ) : (
                       <Text size="xs" variant="muted">
                         {checkingCode
-                          ? 'Checking code…'
-                          : 'Enter the code your landlord shared with you.'}
+                          ? 'Checking invite ID…'
+                          : 'Enter the invite ID your landlord shared with you.'}
                       </Text>
                     )}
 

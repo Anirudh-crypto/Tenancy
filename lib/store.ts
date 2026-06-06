@@ -198,8 +198,8 @@ interface State {
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
   signOut: () => Promise<void>;
 
-  /** Sign up a tenant with an invite code: creates account (username+password),
-   *  then redeems the code to link them to the property. */
+  /** Sign up a tenant with an invite ID: creates account (username+password),
+   *  then redeems the ID to link them to the property. */
   signUpTenantWithInvite: (input: {
     username: string;
     password: string;
@@ -458,13 +458,13 @@ export const useStore = create<State>()(
           return { ok: false, error: 'Password must be at least 6 characters.' };
         }
         if (!code.trim()) {
-          return { ok: false, error: 'Enter the invite code from your landlord.' };
+          return { ok: false, error: 'Enter the invite ID from your landlord.' };
         }
 
-        // Validate the code first so we fail before creating an orphan account.
+        // Validate the invite ID first so we fail before creating an orphan account.
         const preview = await previewInvite(code);
         if (!preview) {
-          return { ok: false, error: 'That invite code is invalid or has already been used.' };
+          return { ok: false, error: 'That invite ID is invalid or has already been used.' };
         }
 
         // Synthesize an internal email from the username (Supabase requires an email).
@@ -493,10 +493,15 @@ export const useStore = create<State>()(
           }
         }
 
-        // Ensure the profile row exists, then redeem the code (links profile -> property).
-        await ensureProfile();
+        // Ensure the profile row exists, then redeem the ID (links profile -> property).
+        const initialProfile = await ensureProfile();
+        if (!initialProfile) {
+          await supabase.auth.signOut();
+          return { ok: false, error: 'Could not create your profile. Please try again.' };
+        }
         const redeemed = await redeemInviteDb(code);
         if (!redeemed.ok) {
+          await supabase.auth.signOut();
           return { ok: false, error: redeemed.error };
         }
 
