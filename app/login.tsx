@@ -61,7 +61,7 @@ export default function LoginScreen() {
                 <Building2 size={30} className="text-primary" />
               </View>
               <Text size="2xl" weight="bold">
-                TenancyOS
+                Tenancy
               </Text>
               <Text variant="muted" size="sm" className="text-center">
                 The shared source of truth for your tenancy
