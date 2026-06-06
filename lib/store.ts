@@ -331,20 +331,35 @@ export const useStore = create<State>()(
           password,
           options: { data: { name: name.trim(), role } },
         });
-        if (error) {
+
+        // Email confirmation is disabled, so no confirmation email should be
+        // sent. If the project still has it enabled, signUp tries to email a
+        // confirmation link and can fail with "email rate limit exceeded" even
+        // though the account was created. In that case we don't treat it as
+        // fatal — we try to sign in with the credentials we just submitted.
+        const rateLimited =
+          !!error && /rate limit|email/i.test(error.message);
+        if (error && !rateLimited) {
           return { ok: false, error: error.message };
         }
 
-        // Email confirmation is disabled — no OTP step. If the project still
-        // returned no session (confirmation enabled server-side), sign in with
-        // the password we just set to obtain one immediately.
-        if (!data.session) {
+        // Sign in with the password we just set to obtain a session
+        // immediately (covers both the rate-limited case and a project where
+        // signUp returns no session because confirmation is enabled).
+        if (rateLimited || !data?.session) {
           const { error: signInError } = await supabase.auth.signInWithPassword({
             email: normalized,
             password,
           });
           if (signInError) {
-            return { ok: false, error: signInError.message };
+            // If we can't sign in either, surface the original signUp error if
+            // it was a real failure, otherwise the sign-in error.
+            return {
+              ok: false,
+              error: error
+                ? 'Account created, but email confirmation is enabled on the server. Disable “Confirm email” in your Supabase Auth settings, then sign in.'
+                : signInError.message,
+            };
           }
         }
 

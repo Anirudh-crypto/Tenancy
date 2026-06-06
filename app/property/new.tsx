@@ -302,7 +302,7 @@ export default function NewPropertyScreen() {
               <View className="flex-1 pr-4">
                 <Text weight="semibold">Currently occupied</Text>
                 <Text size="xs" variant="muted">
-                  Mark vacant if it's available for new tenants.
+                  Mark vacant if it&apos;s available for new tenants.
                 </Text>
               </View>
               <Switch checked={occupied} onCheckedChange={setOccupied} />

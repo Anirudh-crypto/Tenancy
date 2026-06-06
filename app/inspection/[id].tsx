@@ -284,7 +284,7 @@ export default function InspectionDetailScreen() {
             size="lg"
             disabled={inspection.photos.length === 0}
             onPress={() => {
-              sign(inspection.id, role === 'tenant' ? property.tenantName : property.landlordName);
+              void sign(inspection.id, role === 'tenant' ? property.tenantName : property.landlordName);
               toast({ title: 'Report signed & logged to timeline', variant: 'success' });
             }}>
             <View className="flex-row items-center gap-2">
