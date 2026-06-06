@@ -2,19 +2,23 @@ import { formatDistanceToNow } from 'date-fns';
 import { router } from 'expo-router';
 import {
   ArrowRight,
+  Building2,
   CalendarClock,
   ClipboardCheck,
   LogOut,
+  MapPin,
+  Plus,
   ShieldAlert,
   Wrench,
 } from 'lucide-react-native';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RiskBadge } from '@/components/StatusBadges';
-import { Avatar, AvatarFallback, Badge, Button, Card, CardContent, Separator, Text } from '@/components/ui';
+import { Avatar, AvatarFallback, Badge, Button, Card, CardContent, Separator, Skeleton, Text } from '@/components/ui';
 import { useStore } from '@/lib/store';
+import type { Property } from '@/lib/types';
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -38,6 +42,8 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 
 export default function HomeScreen() {
   const property = useStore((s) => s.property);
+  const properties = useStore((s) => s.properties);
+  const propertiesLoading = useStore((s) => s.propertiesLoading);
   const tickets = useStore((s) => s.tickets);
   const risks = useStore((s) => s.risks);
   const role = useStore((s) => s.role);
@@ -159,6 +165,60 @@ export default function HomeScreen() {
           </Animated.View>
         ) : null}
 
+        {/* Landlord: property portfolio */}
+        {role === 'landlord' ? (
+          <Animated.View entering={FadeInDown.delay(120)}>
+            <View className="mb-2 mt-6 flex-row items-center justify-between">
+              <Text size="sm" weight="semibold" variant="muted">
+                MY PROPERTIES
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Add property"
+                hitSlop={8}
+                className="min-h-[36px] flex-row items-center gap-1 rounded-md bg-primary px-3 py-1.5 active:opacity-80"
+                onPress={() => router.push('/property/new')}>
+                <Plus size={15} className="text-primary-foreground" />
+                <Text size="xs" weight="semibold" className="text-primary-foreground">
+                  Add
+                </Text>
+              </Pressable>
+            </View>
+            {propertiesLoading && properties.length === 0 ? (
+              <View className="gap-3">
+                <Skeleton className="h-28 w-full rounded-xl" />
+                <Skeleton className="h-28 w-full rounded-xl" />
+              </View>
+            ) : properties.length > 0 ? (
+              <View className="gap-3">
+                {properties.map((p) => (
+                  <PropertyCard key={p.id} property={p} />
+                ))}
+              </View>
+            ) : (
+              <Card>
+                <CardContent className="items-center gap-3 py-8">
+                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                    <Building2 size={26} className="text-primary" />
+                  </View>
+                  <Text weight="semibold">No properties yet</Text>
+                  <Text size="sm" variant="muted" className="text-center">
+                    Add your first property to start tracking rent, deposits, and tenants.
+                  </Text>
+                  <Button size="sm" className="mt-1" onPress={() => router.push('/property/new')}>
+                    <View className="flex-row items-center gap-1.5">
+                      <Plus size={15} className="text-primary-foreground" />
+                      <Text size="sm" weight="semibold" className="text-primary-foreground">
+                        Add property
+                      </Text>
+                    </View>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </Animated.View>
+        ) : null}
+
         <Text size="sm" weight="semibold" variant="muted" className="mb-2 mt-6">
           QUICK ACTIONS
         </Text>
@@ -192,6 +252,72 @@ export default function HomeScreen() {
         </Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function PropertyCard({ property }: { property: Property }) {
+  const tenantSummary =
+    property.tenants.length > 0
+      ? property.tenants.map((t) => t.name).join(', ')
+      : 'No current tenant';
+  return (
+    <Card>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${property.name}`}
+        className="active:opacity-70"
+        onPress={() => router.push(`/property/${property.id}`)}>
+        <CardContent className="gap-3 py-4">
+          <View className="flex-row items-center gap-3">
+            <View className="h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+              <Building2 size={22} className="text-primary" />
+            </View>
+            <View className="flex-1">
+              <View className="flex-row items-center gap-2">
+                <Text weight="semibold" className="flex-1" numberOfLines={1}>
+                  {property.name}
+                </Text>
+                <Badge variant={property.status === 'occupied' ? 'default' : 'secondary'}>
+                  <Text size="xs" weight="semibold">
+                    {property.status === 'occupied' ? 'Occupied' : 'Vacant'}
+                  </Text>
+                </Badge>
+              </View>
+              <View className="mt-0.5 flex-row items-center gap-1">
+                <MapPin size={13} className="text-muted-foreground" />
+                <Text size="xs" variant="muted" numberOfLines={1} className="flex-1">
+                  {property.address}, {property.city}
+                </Text>
+              </View>
+            </View>
+            <ArrowRight size={18} className="text-muted-foreground" />
+          </View>
+          <Separator />
+          <View className="flex-row items-center justify-between">
+            <View>
+              <Text size="xs" variant="muted">
+                Rent
+              </Text>
+              <Text weight="semibold">€{property.rent.toLocaleString()}</Text>
+            </View>
+            <View>
+              <Text size="xs" variant="muted">
+                {property.bedrooms} bd · {property.bathrooms} ba
+              </Text>
+              <Text size="sm">{property.sizeSqm} m²</Text>
+            </View>
+            <View className="max-w-[45%] items-end">
+              <Text size="xs" variant="muted">
+                Tenant
+              </Text>
+              <Text size="sm" numberOfLines={1}>
+                {tenantSummary}
+              </Text>
+            </View>
+          </View>
+        </CardContent>
+      </Pressable>
+    </Card>
   );
 }
 

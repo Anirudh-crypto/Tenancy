@@ -86,6 +86,17 @@ export interface RiskSignal {
   category: 'moisture' | 'deposit' | 'maintenance' | 'legal';
 }
 
+export interface PropertyTenant {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  moveInDate: string;
+  leaseEndDate?: string;
+}
+
+export type PropertyStatus = 'occupied' | 'vacant';
+
 export interface Property {
   id: string;
   name: string;
@@ -96,4 +107,13 @@ export interface Property {
   tenantName: string;
   landlordName: string;
   moveInDate: string;
+  // Extended detail fields
+  status: PropertyStatus;
+  propertyType: string;
+  bedrooms: number;
+  bathrooms: number;
+  sizeSqm: number;
+  floor?: string;
+  tenants: PropertyTenant[];
+  notes?: string;
 }

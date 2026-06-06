@@ -10,8 +10,9 @@ import { useToast } from '@/components/ui/toast';
 import { useStore } from '@/lib/store';
 
 export default function VerifyScreen() {
-  const params = useLocalSearchParams<{ email?: string }>();
-  const email = params.email ?? '';
+  const params = useLocalSearchParams();
+  const emailParam = params.email;
+  const email = Array.isArray(emailParam) ? emailParam[0] ?? '' : emailParam ?? '';
   const verifySignup = useStore((s) => s.verifySignup);
   const resendSignupCode = useStore((s) => s.resendSignupCode);
   const { toast } = useToast();

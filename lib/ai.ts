@@ -14,9 +14,9 @@ const ROOM_LABELS: Record<RoomKey, string> = {
   hallway: 'Hallway',
 } as const;
 
-export const ROOMS: { key: RoomKey; label: string }[] = (
-  Object.keys(ROOM_LABELS) as RoomKey[]
-).map((key) => ({ key, label: ROOM_LABELS[key] }));
+export const ROOMS: { key: RoomKey; label: string }[] = Object.entries(ROOM_LABELS).map(
+  ([key, label]) => ({ key: key as RoomKey, label })
+);
 
 export function roomLabel(room: RoomKey): string {
   return ROOM_LABELS[room];

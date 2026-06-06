@@ -3,7 +3,14 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { genId, triageTicket } from './ai';
-import { ensureProfile, fetchProfile, supabase } from './supabase';
+import {
+  ensureProfile,
+  fetchProfile,
+  fetchProperties,
+  insertProperty,
+  type NewPropertyInput,
+  supabase,
+} from './supabase';
 import type {
   DetectedDamage,
   Inspection,
@@ -35,6 +42,23 @@ const SEED_PROPERTY: Property = {
   tenantName: 'Lena Hoffmann',
   landlordName: 'M. Becker Immobilien',
   moveInDate: iso(420),
+  status: 'occupied',
+  propertyType: 'Apartment · Altbau',
+  bedrooms: 3,
+  bathrooms: 1,
+  sizeSqm: 86,
+  floor: '3rd floor',
+  notes: 'Period building, high ceilings. Bathroom prone to moisture — see open risks.',
+  tenants: [
+    {
+      id: 'ten_1',
+      name: 'Lena Hoffmann',
+      email: 'lena.hoffmann@example.com',
+      phone: '+49 30 1234 5678',
+      moveInDate: iso(420),
+      leaseEndDate: iso(-300),
+    },
+  ],
 };
 
 const SEED_TIMELINE: TimelineEvent[] = [
@@ -98,6 +122,8 @@ const SEED_RISKS: RiskSignal[] = [
 
 interface State {
   property: Property;
+  properties: Property[];
+  propertiesLoading: boolean;
   tickets: Ticket[];
   timeline: TimelineEvent[];
   inspections: Inspection[];
@@ -134,6 +160,11 @@ interface State {
   signOut: () => Promise<void>;
 
   setRole: (r: 'tenant' | 'landlord') => void;
+  getProperty: (id: string) => Property | undefined;
+  loadProperties: () => Promise<void>;
+  addProperty: (
+    input: NewPropertyInput
+  ) => Promise<{ ok: true; id: string } | { ok: false; error: string }>;
   addTicket: (input: { title: string; description: string }) => Ticket;
   respondToTicket: (ticketId: string, text: string) => void;
   setTicketStatus: (ticketId: string, status: Ticket['status']) => void;
@@ -162,6 +193,8 @@ export const useStore = create<State>()(
   persist(
     (set, get) => ({
       property: SEED_PROPERTY,
+      properties: [],
+      propertiesLoading: false,
       tickets: SEED_TICKETS,
       timeline: SEED_TIMELINE,
       inspections: [],
@@ -179,6 +212,9 @@ export const useStore = create<State>()(
             const profile = await ensureProfile();
             if (profile) {
               set({ user: profile, role: profile.role });
+              if (profile.role === 'landlord') {
+                void get().loadProperties();
+              }
             }
           }
         } catch {
@@ -190,12 +226,17 @@ export const useStore = create<State>()(
         // Keep store in sync with auth state changes (token refresh, sign out, etc.)
         supabase.auth.onAuthStateChange((_event, session) => {
           if (!session?.user) {
-            set({ user: null });
+            set({ user: null, properties: [] });
             return;
           }
           void (async () => {
             const profile = await ensureProfile();
-            if (profile) set({ user: profile, role: profile.role });
+            if (profile) {
+              set({ user: profile, role: profile.role });
+              if (profile.role === 'landlord') {
+                void get().loadProperties();
+              }
+            }
           })();
         });
       },
@@ -214,6 +255,9 @@ export const useStore = create<State>()(
           return { ok: false, error: 'Could not load your profile. Please try again.' };
         }
         set({ user: profile, role: profile.role });
+        if (profile.role === 'landlord') {
+          void get().loadProperties();
+        }
         return { ok: true };
       },
 
@@ -254,6 +298,9 @@ export const useStore = create<State>()(
         const profile = await ensureProfile();
         if (profile) {
           set({ user: profile, role: profile.role });
+          if (profile.role === 'landlord') {
+            void get().loadProperties();
+          }
         }
         return { ok: true };
       },
@@ -302,10 +349,32 @@ export const useStore = create<State>()(
 
       signOut: async () => {
         await supabase.auth.signOut();
-        set({ user: null });
+        set({ user: null, properties: [] });
       },
 
       setRole: (role) => set({ role }),
+      getProperty: (id) => get().properties.find((p) => p.id === id),
+
+      loadProperties: async () => {
+        const user = get().user;
+        if (!user) return;
+        set({ propertiesLoading: true });
+        try {
+          const properties = await fetchProperties(user.id);
+          set({ properties });
+        } finally {
+          set({ propertiesLoading: false });
+        }
+      },
+
+      addProperty: async (input) => {
+        const user = get().user;
+        if (!user) return { ok: false, error: 'You must be signed in.' };
+        const result = await insertProperty(user.id, input);
+        if (!result.ok) return result;
+        set((s) => ({ properties: [result.property, ...s.properties] }));
+        return { ok: true, id: result.property.id };
+      },
 
       addTicket: ({ title, description }) => {
         const triage = triageTicket(`${title} ${description}`);

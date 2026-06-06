@@ -209,6 +209,11 @@ export default function RootLayout() {
               />
               <Stack.Screen name="ticket/[id]" options={{ title: 'Ticket' }} />
               <Stack.Screen name="inspection/[id]" options={{ title: 'Inspection' }} />
+              <Stack.Screen name="property/[id]" options={{ title: 'Property' }} />
+              <Stack.Screen
+                name="property/new"
+                options={{ title: 'Add property', presentation: 'modal' }}
+              />
             </Stack>
           </ToastProvider>
         </GestureHandlerRootView>
