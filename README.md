@@ -1,4 +1,4 @@
-# Welcome to your Bilt project
+# ClearLease
 
 [![Built with Bilt](https://img.shields.io/endpoint?url=https%3A%2F%2Fapp.bilt.me%2Fapi%2Fbadge)](https://bilt.me)
 
@@ -8,159 +8,134 @@
 
 **Project ID**: `1565044b-65fb-42da-96e7-06aa10efeeed`
 
-## How can I edit this app?
+## About
 
-There are several ways of editing your application.
+ClearLease is a mobile tenancy management app built for the Founder Hackathon. It gives landlords and tenants a shared, auditable record of everything that happens during a lease — maintenance tickets, inspections, timeline events, and AI-powered risk signals — so disputes are easier to prevent and resolve.
 
-**Use Bilt**
+Landlords manage a portfolio of properties, invite tenants with single-use codes, and drive ticket workflows. Tenants report issues, capture move-in photos, and follow the same timeline their landlord sees.
 
-Simply visit your [Bilt Project](https://app.bilt.me/agent/1565044b-65fb-42da-96e7-06aa10efeeed) and start sending messages. Describe what you want to change, add, or fix in natural language.
+## Features
 
-Changes made via Bilt are instant - just send a message and your app updates.
+### For landlords
 
-**Use your preferred IDE**
+- **Portfolio dashboard** — view all properties, rent, occupancy, and tenant summaries in one place
+- **Property management** — add units, track layout and financials, and open a property workspace
+- **Invite-only tenant onboarding** — generate single-use invite IDs; tenants redeem them at signup
+- **Ticket workflow** — acknowledge, start work, and mark issues resolved with a threaded conversation
+- **AI legal guidance** — suggested response timelines for maintenance issues (e.g. German *Mietminderung* rules)
+- **Inspections** — review tenant move-in reports and start move-out reports with deposit recommendations
+- **Tenancy timeline** — GitHub-style event history as the single source of truth
+- **Risk prediction** — AI flags moisture, deposit, maintenance, and legal risks early
 
-If you want to work locally using your own IDE, you can export the source code from Bilt and make changes directly.
+### For tenants
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Username-based login** — sign in with the credentials created during invite redemption
+- **Issue reporting** — submit tickets with AI triage for urgency, category, and legal notes
+- **Move-in documentation** — photo-based room capture with AI damage detection before signing
+- **Shared timeline** — every report and reply is logged and visible to both parties
+- **Conversation** — reply on tickets without changing landlord-only workflow status
 
-Follow these steps:
+## Screenshots
+
+Screens are shown in the order a user typically flows through the app: sign in → landlord setup → day-to-day tenancy management.
+
+### 1. Sign in — Tenant
+
+Tenants log in with a username and password created when they redeem a landlord invite.
+
+![Sign in — Tenant](images/2026-06-06_18h06_10.png)
+
+### 2. Sign in — Landlord
+
+Landlords log in with email and password and land on their property portfolio.
+
+![Sign in — Landlord](images/2026-06-06_18h06_54.png)
+
+### 3. Landlord portfolio
+
+The **My Properties** screen lists every unit with rent, size, occupancy status, and current tenant.
+
+![Landlord portfolio — My Properties](images/2026-06-06_17h56_04.png)
+
+### 4. Property details & tenant invites
+
+Landlords view property metadata, linked tenants, and generate or revoke single-use invite IDs.
+
+![Property details and tenant invites](images/2026-06-06_17h57_07.png)
+
+### 5. Maintenance ticket — open
+
+Tenants report issues with AI legal guidance and a response deadline. Status actions are landlord-only.
+
+![Maintenance ticket — open (tenant view)](images/2026-06-06_17h13_45.png)
+
+### 6. Maintenance ticket — resolved
+
+Landlords manage the full workflow and converse with tenants until the ticket is marked resolved.
+
+![Maintenance ticket — resolved (landlord view)](images/2026-06-06_17h57_52.png)
+
+### 7. Tenancy timeline
+
+Every ticket, inspection, and key event is appended to a shared, chronological history.
+
+![Tenancy timeline](images/2026-06-06_17h58_30.png)
+
+### 8. Inspections
+
+Move-in reports are tenant-led; landlords review signed reports and can start move-out inspections with deposit recommendations.
+
+![Inspections hub](images/2026-06-06_17h58_48.png)
+
+### 9. Move-in report
+
+Tenants capture each room with AI damage detection, then sign the report to lock in pre-existing condition.
+
+![Move-in report — room capture](images/2026-06-06_17h59_40.png)
+
+## Tech stack
+
+- **React Native** + **Expo** (SDK 54)
+- **TypeScript**
+- **Expo Router** — file-based navigation with role-aware auth guards
+- **NativeWind** — Tailwind-style styling
+- **Zustand** — client state and persistence
+- **Supabase** — auth, property data, invite-only tenant signup, and RLS
+- **React Hook Form** + **Zod** — form validation
+
+## Getting started
+
+### Preview (recommended)
+
+Open the preview URL in your browser or scan the QR code with [Expo Go](https://expo.dev/go) on your phone:
+
+```
+https://app.bilt.me/project/1565044b-65fb-42da-96e7-06aa10efeeed/preview
+```
+
+### Run locally
 
 ```sh
-# Step 1: Export and clone your Bilt project.
-# (Download source from Bilt or connect to your git repo)
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
 npm install
-
-# Step 4: Start the Expo development server.
 npx expo start
 ```
 
-Scan the QR code with Expo Go on your phone to see your app running locally.
+Then press `w` for web, or scan the QR code with Expo Go.
 
-**Edit a file directly in GitHub**
+## Supabase setup
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- React Native
-- Expo
-- TypeScript
-- AsyncStorage (local data persistence)
-- Expo Router (navigation)
-
-All generated automatically by Bilt from your natural language instructions.
-
-## How can I test this project?
-
-**Option 1: Instant Preview (Recommended)**
-
-Open the preview URL in your browser: `https://app.bilt.me/project/1565044b-65fb-42da-96e7-06aa10efeeed/preview`
-
-Scan the QR code with Expo Go ([iOS](https://apps.apple.com/app/expo-go/id982107779) | [Android](https://play.google.com/store/apps/details?id=host.exp.exponent)) on your phone.
-
-**Option 2: Run Locally**
-
-```sh
-npm install
-npx expo start
-```
-
-Then scan the QR code with Expo Go.
-
-## Supabase invite-only tenant signup
-
-Tenant accounts are invite-only. A landlord opens a property, generates a single-use invite ID, and shares it with the tenant. The tenant signs up with that invite ID plus a username and password; redemption links the tenant profile to that property only.
+Tenant accounts are invite-only. A landlord opens a property, generates a single-use invite ID, and shares it with the tenant. The tenant signs up with that ID plus a username and password; redemption links their profile to that property only.
 
 Apply the migration in `supabase/migrations/20260606170000_invite_tenant_signup.sql` to create the `property_invites` table, invite preview/redemption RPCs, tenant property linking, and property-scoped RLS policies.
 
-## How can I deploy this project?
+## Deploy
 
-Go to your [Bilt Project](https://app.bilt.me/agent/1565044b-65fb-42da-96e7-06aa10efeeed), after that go to Settings -> App Store.
+Go to your [Bilt project](https://app.bilt.me/agent/1565044b-65fb-42da-96e7-06aa10efeeed), then **Settings → App Store**.
 
-### Deploy with Bilt
+To trigger a production build from chat, send: *"Deploy this app to production"*
 
-Simply send a message to your Bilt project: "Deploy this app to production"
+## Making changes
 
-Bilt will handle the build and provide you with download links or submission-ready builds.
+Visit your [Bilt project](https://app.bilt.me/agent/1565044b-65fb-42da-96e7-06aa10efeeed) and describe changes in natural language — Bilt updates the codebase automatically.
 
-## How can I make changes to my app?
-
-**Via Bilt (Easiest)**
-
-Visit your [Bilt Project](https://app.bilt.me/agent/1565044b-65fb-42da-96e7-06aa10efeeed) and send a message describing what you want:
-
-- "Add a dark mode toggle"
-- "Change the button color to blue"
-- "Add a new screen for user settings"
-- "Fix the navigation bar spacing"
-
-Bilt understands natural language and updates your app automatically.
-
-**Via Code**
-
-Export the source, make changes in your IDE, and test locally with `npx expo start`.
-
-## Can I use this with the MCP protocol?
-
-Yes! Bilt is available as a remote MCP server at `https://mcp.bilt.me/mcp`.
-
-Connect any MCP-compatible AI agent (Claude Desktop, OpenClaw, etc.) to programmatically build and modify mobile apps.
-
-**Example MCP integration:**
-
-```json
-{
-  "mcpServers": {
-    "bilt": {
-      "transport": {
-        "type": "sse",
-        "url": "https://mcp.bilt.me/mcp/sse",
-        "headers": {
-          "Authorization": "Bearer YOUR_API_KEY"
-        }
-      }
-    }
-  }
-}
-```
-
-Read more:
-
-- [Bilt MCP Documentation](https://bilt.me/docs)
-- [MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.buildingapplications%2Fmcp/versions/latest)
-
-## Need help?
-
-- 📚 [Bilt Documentation](https://bilt.me/docs)
-- 💬 [Discord Community](https://discord.gg/3FqNgmSYdZ)
-- 🐦 [Twitter Updates](https://twitter.com/biltmeanapp)
-- 📧 Email: support@bilt.me
-
----
-
-<div align="center">
-
-**Built by AI. No code required.** ✨
-
-[Try Bilt](https://bilt.me) • [View Docs](https://bilt.me/docs) • [Docs MCP Server](https://bilt.me/docs/mcp)
-
-</div>
+For local development, edit files under `app/`, `components/`, and `lib/`, then run `npx expo start` to preview.
