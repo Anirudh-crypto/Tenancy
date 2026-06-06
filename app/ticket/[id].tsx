@@ -122,20 +122,20 @@ export default function TicketDetailScreen() {
             </Card>
           ) : null}
 
-          {next ? (
+          {role === 'landlord' && next ? (
             <Button className="mt-4" onPress={() => setStatus(ticket.id, next.status)}>
               <Text weight="semibold" className="text-primary-foreground">
                 {next.label}
               </Text>
             </Button>
-          ) : (
+          ) : ticket.status === 'resolved' ? (
             <View className="mt-4 flex-row items-center justify-center gap-2 rounded-md bg-emerald-500/10 py-3">
               <CheckCircle2 size={18} className="text-emerald-500" />
               <Text weight="semibold" className="text-emerald-600">
                 Resolved
               </Text>
             </View>
-          )}
+          ) : null}
 
           <Separator className="my-5" />
           <Text size="sm" weight="semibold" variant="muted" className="mb-3">
