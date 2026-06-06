@@ -1,5 +1,5 @@
-import { Link, router } from 'expo-router';
-import { Home, KeyRound, Lock, Mail, User } from 'lucide-react-native';
+import { Link } from 'expo-router';
+import { Home, KeyRound, Lock, Mail, Ticket as TicketIcon, User } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -7,36 +7,66 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, CardContent, Input, Text } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
-import { cn } from '@/lib/utils';
+import { previewInvite, type InvitePreview } from '@/lib/supabase';
 import { useStore } from '@/lib/store';
-import type { Role } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
-const ROLE_OPTIONS: { role: Role; title: string; sub: string; icon: typeof Home }[] = [
-  { role: 'tenant', title: 'Tenant', sub: 'I rent a home', icon: KeyRound },
-  { role: 'landlord', title: 'Landlord', sub: 'I manage a property', icon: Home },
+type Mode = 'tenant' | 'landlord';
+
+const MODE_OPTIONS: { mode: Mode; title: string; sub: string; icon: typeof Home }[] = [
+  { mode: 'tenant', title: 'Tenant', sub: 'I have an invite code', icon: KeyRound },
+  { mode: 'landlord', title: 'Landlord', sub: 'I manage properties', icon: Home },
 ];
 
 export default function SignUpScreen() {
   const signUp = useStore((s) => s.signUp);
+  const signUpTenantWithInvite = useStore((s) => s.signUpTenantWithInvite);
   const { toast } = useToast();
+  const [mode, setMode] = useState<Mode>('tenant');
+
+  // Landlord fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+
+  // Tenant fields
+  const [code, setCode] = useState('');
+  const [username, setUsername] = useState('');
+  const [preview, setPreview] = useState<InvitePreview | null>(null);
+  const [checkingCode, setCheckingCode] = useState(false);
+
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<Role>('tenant');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const onCheckCode = async () => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setError(null);
+    setCheckingCode(true);
+    const result = await previewInvite(trimmed);
+    setCheckingCode(false);
+    if (!result) {
+      setPreview(null);
+      setError('That invite code is invalid or has already been used.');
+      return;
+    }
+    setPreview(result);
+  };
 
   const onSubmit = async () => {
     setError(null);
     setSubmitting(true);
-    const result = await signUp({ name, email, password, role });
+    const result =
+      mode === 'tenant'
+        ? await signUpTenantWithInvite({ username, password, code })
+        : await signUp({ name, email, password, role: 'landlord' });
     setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
       return;
     }
     toast({ title: 'Account created', variant: 'success' });
-    router.replace('/(tabs)');
+    // Auth guard in app/_layout.tsx handles navigation once `user` is set.
   };
 
   return (
@@ -59,21 +89,21 @@ export default function SignUpScreen() {
             </View>
 
             <View className="mb-4 flex-row gap-3">
-              {ROLE_OPTIONS.map((opt) => {
+              {MODE_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
-                const active = role === opt.role;
+                const active = mode === opt.mode;
                 return (
                   <Pressable
-                    key={opt.role}
-                    onPress={() => setRole(opt.role)}
+                    key={opt.mode}
+                    onPress={() => {
+                      setMode(opt.mode);
+                      setError(null);
+                    }}
                     className={cn(
                       'flex-1 rounded-xl border p-4',
                       active ? 'border-primary bg-primary/10' : 'border-border bg-card'
                     )}>
-                    <Icon
-                      size={22}
-                      className={active ? 'text-primary' : 'text-muted-foreground'}
-                    />
+                    <Icon size={22} className={active ? 'text-primary' : 'text-muted-foreground'} />
                     <Text weight="semibold" className="mt-2">
                       {opt.title}
                     </Text>
@@ -87,24 +117,72 @@ export default function SignUpScreen() {
 
             <Card>
               <CardContent className="gap-4 py-6">
-                <Input
-                  label="Full name"
-                  leftIcon={<User size={18} className="text-muted-foreground" />}
-                  placeholder="Your name"
-                  value={name}
-                  onChangeText={setName}
-                />
+                {mode === 'tenant' ? (
+                  <>
+                    <Input
+                      label="Invite code"
+                      leftIcon={<TicketIcon size={18} className="text-muted-foreground" />}
+                      placeholder="e.g. BERL-7K2Q"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      value={code}
+                      onChangeText={(t) => {
+                        setCode(t);
+                        setPreview(null);
+                      }}
+                      onBlur={() => void onCheckCode()}
+                    />
 
-                <Input
-                  label="Email"
-                  leftIcon={<Mail size={18} className="text-muted-foreground" />}
-                  placeholder="you@example.com"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoComplete="email"
-                  value={email}
-                  onChangeText={setEmail}
-                />
+                    {preview ? (
+                      <View className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                        <Text size="xs" variant="muted">
+                          You&apos;ll be added to
+                        </Text>
+                        <Text weight="semibold">{preview.propertyName}</Text>
+                        <Text size="sm" variant="muted">
+                          {preview.propertyAddress}, {preview.city}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text size="xs" variant="muted">
+                        {checkingCode
+                          ? 'Checking code…'
+                          : 'Enter the code your landlord shared with you.'}
+                      </Text>
+                    )}
+
+                    <Input
+                      label="Username"
+                      leftIcon={<User size={18} className="text-muted-foreground" />}
+                      placeholder="Choose a username"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={username}
+                      onChangeText={setUsername}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Input
+                      label="Full name"
+                      leftIcon={<User size={18} className="text-muted-foreground" />}
+                      placeholder="Your name"
+                      value={name}
+                      onChangeText={setName}
+                    />
+
+                    <Input
+                      label="Email"
+                      leftIcon={<Mail size={18} className="text-muted-foreground" />}
+                      placeholder="you@example.com"
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      autoComplete="email"
+                      value={email}
+                      onChangeText={setEmail}
+                    />
+                  </>
+                )}
 
                 <Input
                   label="Password"

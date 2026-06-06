@@ -5,6 +5,8 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  /** For tenants: the property they were invited to (null until they redeem a code). */
+  tenantPropertyId?: string | null;
 }
 
 export type Urgency = 'emergency' | 'high' | 'medium' | 'low';

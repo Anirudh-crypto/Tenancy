@@ -42,16 +42,37 @@ export interface Profile {
   email: string;
   name: string;
   role: 'tenant' | 'landlord';
+  /** For tenants: the property they were invited to (null until they redeem a code). */
+  tenantPropertyId: string | null;
+}
+
+interface ProfileRow {
+  id: string;
+  email: string;
+  name: string;
+  role: 'tenant' | 'landlord';
+  tenant_property_id: string | null;
+}
+
+function rowToProfile(row: ProfileRow): Profile {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    role: row.role,
+    tenantPropertyId: row.tenant_property_id,
+  };
 }
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, name, role')
+    .select('id, email, name, role, tenant_property_id')
     .eq('id', userId)
     .single();
   if (error || !data) return null;
-  return data as Profile;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return rowToProfile(data as ProfileRow);
 }
 
 /**
@@ -75,9 +96,15 @@ export async function ensureProfile(): Promise<Profile | null> {
     email: authUser.email ?? '',
     name: meta.name ?? '',
     role,
+    tenantPropertyId: null,
   };
 
-  const { error } = await supabase.from('profiles').upsert(profile, { onConflict: 'id' });
+  const { error } = await supabase
+    .from('profiles')
+    .upsert(
+      { id: profile.id, email: profile.email, name: profile.name, role: profile.role },
+      { onConflict: 'id' }
+    );
   if (error) {
     // Even if the insert fails (e.g. transient), return the in-memory profile so
     // the user can proceed rather than being bounced back to login.
@@ -177,6 +204,142 @@ export async function insertProperty(
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return { ok: true, property: rowToProperty(data as PropertyRow) };
+}
+
+export async function fetchPropertyById(id: string): Promise<Property | null> {
+  const { data, error } = await supabase.from('properties').select('*').eq('id', id).single();
+  if (error || !data) return null;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return rowToProperty(data as PropertyRow);
+}
+
+// ---------------------------------------------------------------------------
+// Invite codes: a landlord generates a single-use code for a property; a tenant
+// redeems it during signup to be linked to that property.
+// ---------------------------------------------------------------------------
+
+export interface PropertyInvite {
+  id: string;
+  code: string;
+  propertyId: string;
+  status: 'active' | 'redeemed' | 'revoked';
+  redeemedBy: string | null;
+  redeemedAt: string | null;
+  createdAt: string;
+}
+
+interface InviteRow {
+  id: string;
+  code: string;
+  property_id: string;
+  owner_id: string;
+  status: 'active' | 'redeemed' | 'revoked';
+  redeemed_by: string | null;
+  redeemed_at: string | null;
+  created_at: string;
+}
+
+function rowToInvite(row: InviteRow): PropertyInvite {
+  return {
+    id: row.id,
+    code: row.code,
+    propertyId: row.property_id,
+    status: row.status,
+    redeemedBy: row.redeemed_by,
+    redeemedAt: row.redeemed_at,
+    createdAt: row.created_at,
+  };
+}
+
+/** Human-friendly code, e.g. "BERL-7K2Q". Avoids ambiguous chars (0/O, 1/I). */
+function generateInviteCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const pick = (n: number) =>
+    Array.from({ length: n }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+  return `${pick(4)}-${pick(4)}`;
+}
+
+export async function fetchInvitesForProperty(propertyId: string): Promise<PropertyInvite[]> {
+  const { data, error } = await supabase
+    .from('property_invites')
+    .select('*')
+    .eq('property_id', propertyId)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return (data as InviteRow[]).map(rowToInvite);
+}
+
+export async function createInvite(
+  ownerId: string,
+  propertyId: string
+): Promise<{ ok: true; invite: PropertyInvite } | { ok: false; error: string }> {
+  // Retry a couple of times in the (unlikely) event of a code collision.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const code = generateInviteCode();
+    const { data, error } = await supabase
+      .from('property_invites')
+      .insert({ code, property_id: propertyId, owner_id: ownerId, status: 'active' })
+      .select('*')
+      .single();
+    if (!error && data) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return { ok: true, invite: rowToInvite(data as InviteRow) };
+    }
+    if (error && !/duplicate|unique/i.test(error.message)) {
+      return { ok: false, error: error.message };
+    }
+  }
+  return { ok: false, error: 'Could not generate a unique code. Please try again.' };
+}
+
+export async function revokeInvite(inviteId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('property_invites')
+    .update({ status: 'revoked' })
+    .eq('id', inviteId);
+  return !error;
+}
+
+export interface InvitePreview {
+  propertyId: string;
+  propertyName: string;
+  propertyAddress: string;
+  city: string;
+}
+
+/** Validate a code before signup so we can show the tenant which property it's for. */
+export async function previewInvite(code: string): Promise<InvitePreview | null> {
+  const { data, error } = await supabase.rpc('preview_invite', { p_code: code.trim() });
+  if (error || !data || (Array.isArray(data) && data.length === 0)) return null;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    property_id: string;
+    property_name: string;
+    property_address: string;
+    city: string;
+  };
+  return {
+    propertyId: row.property_id,
+    propertyName: row.property_name,
+    propertyAddress: row.property_address,
+    city: row.city,
+  };
+}
+
+/** Consume the code for the current authenticated user. Returns the linked property id. */
+export async function redeemInvite(
+  code: string
+): Promise<{ ok: true; propertyId: string } | { ok: false; error: string }> {
+  const { data, error } = await supabase.rpc('redeem_invite', { p_code: code.trim() });
+  if (error) {
+    const msg = /invalid_code/.test(error.message)
+      ? 'That invite code is invalid or has already been used.'
+      : error.message;
+    return { ok: false, error: msg };
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return { ok: true, propertyId: data as string };
 }
 
 // ---------------------------------------------------------------------------

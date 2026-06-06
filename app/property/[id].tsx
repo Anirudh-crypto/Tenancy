@@ -18,7 +18,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar, AvatarFallback, Badge, Card, CardContent, Separator, Text } from '@/components/ui';
-import { useStore } from '@/lib/store';
+import { InviteTenantSection } from '@/components/InviteTenantSection';
+import { useStore, SEED_PROPERTY_ID } from '@/lib/store';
 import type { PropertyTenant } from '@/lib/types';
 
 function SafeDate(value?: string): Date | null {
@@ -124,6 +125,9 @@ function TenantCard({ tenant }: { tenant: PropertyTenant }) {
 export default function PropertyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const property = useStore((s) => s.getProperty(id));
+  const role = useStore((s) => s.role);
+  const isDbProperty = !!property && property.id !== SEED_PROPERTY_ID;
+  const canInvite = role === 'landlord' && isDbProperty;
 
   if (!property) {
     return (
@@ -280,6 +284,8 @@ export default function PropertyDetailScreen() {
             </CardContent>
           </Card>
         )}
+
+        {canInvite ? <InviteTenantSection property={property} /> : null}
       </ScrollView>
     </SafeAreaView>
   );

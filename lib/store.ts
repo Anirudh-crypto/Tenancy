@@ -4,15 +4,22 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { genId, triageTicket } from './ai';
 import {
+  createInvite as createInviteDb,
   ensureProfile,
+  fetchInvitesForProperty,
   fetchProfile,
   fetchProperties,
+  fetchPropertyById,
   fetchPropertyData,
   insertInspection,
   insertProperty,
   insertTicket,
   insertTimelineEvent,
   type NewPropertyInput,
+  previewInvite,
+  type PropertyInvite,
+  redeemInvite as redeemInviteDb,
+  revokeInvite as revokeInviteDb,
   supabase,
   updateInspection,
   updateTicket,
@@ -191,6 +198,23 @@ interface State {
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
   signOut: () => Promise<void>;
 
+  /** Sign up a tenant with an invite code: creates account (username+password),
+   *  then redeems the code to link them to the property. */
+  signUpTenantWithInvite: (input: {
+    username: string;
+    password: string;
+    code: string;
+  }) => Promise<{ ok: true } | { ok: false; error: string }>;
+
+  /** Invites (landlord) */
+  invites: PropertyInvite[];
+  invitesLoading: boolean;
+  loadInvites: (propertyId: string) => Promise<void>;
+  generateInvite: (
+    propertyId: string
+  ) => Promise<{ ok: true; invite: PropertyInvite } | { ok: false; error: string }>;
+  revokeInvite: (inviteId: string) => Promise<void>;
+
   setRole: (r: 'tenant' | 'landlord') => void;
   getProperty: (id: string) => Property | undefined;
   loadProperties: () => Promise<void>;
@@ -257,6 +281,8 @@ export const useStore = create<State>()(
 
       user: null,
 
+      invites: [],
+      invitesLoading: false,
       initAuth: async () => {
         try {
           const { data } = await supabase.auth.getSession();
@@ -267,6 +293,8 @@ export const useStore = create<State>()(
               set({ user: profile, role: profile.role });
               if (profile.role === 'landlord') {
                 void get().loadProperties();
+              } else if (profile.tenantPropertyId) {
+                void get().setActiveProperty(profile.tenantPropertyId);
               } else {
                 void get().setActiveProperty(SEED_PROPERTY_ID);
               }
@@ -289,6 +317,8 @@ export const useStore = create<State>()(
               set({ user: profile, role: profile.role });
               if (profile.role === 'landlord') {
                 void get().loadProperties();
+              } else if (profile.tenantPropertyId) {
+                void get().setActiveProperty(profile.tenantPropertyId);
               } else {
                 void get().setActiveProperty(SEED_PROPERTY_ID);
               }
@@ -297,8 +327,7 @@ export const useStore = create<State>()(
         });
       },
 
-      signIn: async (email, password) => {
-        const normalized = email.trim().toLowerCase();
+      signIn: async (email, password) => {        const normalized = email.trim().toLowerCase();
         const { data, error } = await supabase.auth.signInWithPassword({
           email: normalized,
           password,
@@ -313,6 +342,8 @@ export const useStore = create<State>()(
         set({ user: profile, role: profile.role });
         if (profile.role === 'landlord') {
           void get().loadProperties();
+        } else if (profile.tenantPropertyId) {
+          void get().setActiveProperty(profile.tenantPropertyId);
         } else {
           void get().setActiveProperty(SEED_PROPERTY_ID);
         }
@@ -412,12 +443,107 @@ export const useStore = create<State>()(
 
       signOut: async () => {
         await supabase.auth.signOut();
-        set({ user: null, properties: [], activePropertyId: null });
+        set({ user: null, properties: [], activePropertyId: null, invites: [] });
+      },
+
+      signUpTenantWithInvite: async ({ username, password, code }) => {
+        const cleanUser = username.trim();
+        if (cleanUser.length < 3) {
+          return { ok: false, error: 'Username must be at least 3 characters.' };
+        }
+        if (!/^[a-zA-Z0-9_.]+$/.test(cleanUser)) {
+          return { ok: false, error: 'Username can only use letters, numbers, _ and .' };
+        }
+        if (password.length < 6) {
+          return { ok: false, error: 'Password must be at least 6 characters.' };
+        }
+        if (!code.trim()) {
+          return { ok: false, error: 'Enter the invite code from your landlord.' };
+        }
+
+        // Validate the code first so we fail before creating an orphan account.
+        const preview = await previewInvite(code);
+        if (!preview) {
+          return { ok: false, error: 'That invite code is invalid or has already been used.' };
+        }
+
+        // Synthesize an internal email from the username (Supabase requires an email).
+        const synthEmail = `${cleanUser.toLowerCase()}@tenant.tenancyos.app`;
+
+        const { data, error } = await supabase.auth.signUp({
+          email: synthEmail,
+          password,
+          options: { data: { name: cleanUser, role: 'tenant' } },
+        });
+
+        const rateLimited = !!error && /rate limit|email/i.test(error.message);
+        if (error && !rateLimited && /already registered|already exists/i.test(error.message)) {
+          return { ok: false, error: 'That username is taken. Try another.' };
+        }
+        if (error && !rateLimited) {
+          return { ok: false, error: error.message };
+        }
+        if (rateLimited || !data?.session) {
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: synthEmail,
+            password,
+          });
+          if (signInError) {
+            return { ok: false, error: 'Could not create your account. Please try again.' };
+          }
+        }
+
+        // Ensure the profile row exists, then redeem the code (links profile -> property).
+        await ensureProfile();
+        const redeemed = await redeemInviteDb(code);
+        if (!redeemed.ok) {
+          return { ok: false, error: redeemed.error };
+        }
+
+        const profile = await ensureProfile();
+        if (!profile) {
+          return { ok: false, error: 'Could not load your profile. Please try again.' };
+        }
+        set({ user: profile, role: 'tenant' });
+        await get().setActiveProperty(redeemed.propertyId);
+        return { ok: true };
+      },
+
+      loadInvites: async (propertyId) => {
+        set({ invitesLoading: true });
+        try {
+          const invites = await fetchInvitesForProperty(propertyId);
+          set({ invites });
+        } finally {
+          set({ invitesLoading: false });
+        }
+      },
+
+      generateInvite: async (propertyId) => {
+        const user = get().user;
+        if (!user) return { ok: false, error: 'You must be signed in.' };
+        const result = await createInviteDb(user.id, propertyId);
+        if (!result.ok) return result;
+        set((s) => ({ invites: [result.invite, ...s.invites] }));
+        return result;
+      },
+
+      revokeInvite: async (inviteId) => {
+        const ok = await revokeInviteDb(inviteId);
+        if (ok) {
+          set((s) => ({
+            invites: s.invites.map((i) =>
+              i.id === inviteId ? { ...i, status: 'revoked' as const } : i
+            ),
+          }));
+        }
       },
 
       setRole: (role) => set({ role }),
-      getProperty: (id) =>
-        id === SEED_PROPERTY_ID ? get().property : get().properties.find((p) => p.id === id),
+      getProperty: (id) => {
+        if (id === SEED_PROPERTY_ID) return get().property;
+        return get().properties.find((p) => p.id === id);
+      },
 
       loadProperties: async () => {
         const user = get().user;
@@ -452,6 +578,12 @@ export const useStore = create<State>()(
               risks: seed.risks,
             });
           } else {
+            // Cache the property itself so getProperty(id) resolves for tenants
+            // (whose linked property isn't in the landlord `properties` list).
+            if (!get().properties.some((p) => p.id === id)) {
+              const prop = await fetchPropertyById(id);
+              if (prop) set((s) => ({ properties: [prop, ...s.properties] }));
+            }
             const data = await fetchPropertyData(id);
             set({
               tickets: data.tickets,

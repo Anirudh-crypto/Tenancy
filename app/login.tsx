@@ -1,17 +1,32 @@
 import { Link, router } from 'expo-router';
-import { Building2, Lock, Mail } from 'lucide-react-native';
+import { Building2, Home, KeyRound, Lock, Mail, User } from 'lucide-react-native';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, CardContent, Input, Text } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { useStore } from '@/lib/store';
+import { cn } from '@/lib/utils';
+
+type Mode = 'tenant' | 'landlord';
+
+const MODE_OPTIONS: { mode: Mode; title: string; sub: string; icon: typeof Home }[] = [
+  { mode: 'tenant', title: 'Tenant', sub: 'Username login', icon: KeyRound },
+  { mode: 'landlord', title: 'Landlord', sub: 'Email login', icon: Home },
+];
+
+/** Tenants authenticate with a username; we map it to the internal email used at signup. */
+function usernameToEmail(username: string): string {
+  return `${username.trim().toLowerCase()}@tenant.tenancyos.app`;
+}
 
 export default function LoginScreen() {
   const signIn = useStore((s) => s.signIn);
   const { toast } = useToast();
+  const [mode, setMode] = useState<Mode>('tenant');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -20,10 +35,11 @@ export default function LoginScreen() {
   const onSubmit = async () => {
     setError(null);
     setSubmitting(true);
-    const result = await signIn(email, password);
+    const identifier = mode === 'tenant' ? usernameToEmail(username) : email;
+    const result = await signIn(identifier, password);
     setSubmitting(false);
     if (!result.ok) {
-      setError(result.error);
+      setError(mode === 'tenant' ? 'Invalid username or password.' : result.error);
       return;
     }
     toast({ title: 'Welcome back', variant: 'success' });
@@ -52,22 +68,61 @@ export default function LoginScreen() {
               </Text>
             </View>
 
+            <View className="mb-4 flex-row gap-3">
+              {MODE_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                const active = mode === opt.mode;
+                return (
+                  <Pressable
+                    key={opt.mode}
+                    onPress={() => {
+                      setMode(opt.mode);
+                      setError(null);
+                    }}
+                    className={cn(
+                      'flex-1 rounded-xl border p-4',
+                      active ? 'border-primary bg-primary/10' : 'border-border bg-card'
+                    )}>
+                    <Icon size={22} className={active ? 'text-primary' : 'text-muted-foreground'} />
+                    <Text weight="semibold" className="mt-2">
+                      {opt.title}
+                    </Text>
+                    <Text size="xs" variant="muted">
+                      {opt.sub}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             <Card>
               <CardContent className="gap-4 py-6">
                 <Text size="lg" weight="bold">
                   Sign in
                 </Text>
 
-                <Input
-                  label="Email"
-                  leftIcon={<Mail size={18} className="text-muted-foreground" />}
-                  placeholder="you@example.com"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoComplete="email"
-                  value={email}
-                  onChangeText={setEmail}
-                />
+                {mode === 'tenant' ? (
+                  <Input
+                    label="Username"
+                    leftIcon={<User size={18} className="text-muted-foreground" />}
+                    placeholder="your username"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={username}
+                    onChangeText={setUsername}
+                  />
+                ) : (
+                  <Input
+                    label="Email"
+                    leftIcon={<Mail size={18} className="text-muted-foreground" />}
+                    placeholder="you@example.com"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoComplete="email"
+                    value={email}
+                    onChangeText={setEmail}
+                  />
+                )}
 
                 <Input
                   label="Password"
@@ -91,15 +146,17 @@ export default function LoginScreen() {
                   </Text>
                 </Button>
 
-                <View className="items-center">
-                  <Text
-                    size="sm"
-                    weight="medium"
-                    className="text-primary"
-                    onPress={() => router.push('/reset-password')}>
-                    Forgot password?
-                  </Text>
-                </View>
+                {mode === 'landlord' ? (
+                  <View className="items-center">
+                    <Text
+                      size="sm"
+                      weight="medium"
+                      className="text-primary"
+                      onPress={() => router.push('/reset-password')}>
+                      Forgot password?
+                    </Text>
+                  </View>
+                ) : null}
 
                 <View className="flex-row items-center justify-center gap-1">
                   <Text size="sm" variant="muted">
