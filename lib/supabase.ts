@@ -2,12 +2,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+// Trim accidental whitespace/newlines that can sneak in when a secret is pasted.
+// A stray trailing newline in the anon key causes Supabase to reject every
+// request with "Invalid API key".
+const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
+const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
 
 if (!supabaseUrl || !supabaseAnonKey) {
   // Surfaced early so misconfiguration is obvious during development.
-  console.warn('Supabase env vars are missing. Auth will not work.');
+  console.warn(
+    `Supabase env vars are missing. url=${supabaseUrl ? 'set' : 'MISSING'} key=${
+      supabaseAnonKey ? 'set' : 'MISSING'
+    }`
+  );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
