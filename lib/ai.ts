@@ -15,6 +15,7 @@ const ROOM_LABELS: Record<RoomKey, string> = {
 } as const;
 
 export const ROOMS: { key: RoomKey; label: string }[] = Object.entries(ROOM_LABELS).map(
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   ([key, label]) => ({ key: key as RoomKey, label })
 );
 

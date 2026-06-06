@@ -5,17 +5,21 @@ import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, CardContent, Text } from '@/components/ui';
+import { useActiveProperty } from '@/hooks/useActiveProperty';
 import { useStore } from '@/lib/store';
 import type { InspectionKind } from '@/lib/types';
 
 export default function InspectScreen() {
+  useActiveProperty();
   const inspections = useStore((s) => s.inspections);
   const createInspection = useStore((s) => s.createInspection);
   const role = useStore((s) => s.role);
 
   const start = (kind: InspectionKind) => {
-    const id = createInspection(kind);
-    router.push(`/inspection/${id}`);
+    void (async () => {
+      const id = await createInspection(kind);
+      if (id) router.push(`/inspection/${id}`);
+    })();
   };
 
   return (

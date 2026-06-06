@@ -93,7 +93,7 @@ export default function NewPropertyScreen() {
     }
     toast({ title: 'Property added', variant: 'success' });
     if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)');
+    else router.replace('/properties');
   };
 
   return (
@@ -103,7 +103,7 @@ export default function NewPropertyScreen() {
           title: 'Add property',
           headerLeft: () => (
             <Pressable
-              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/properties'))}
               hitSlop={12}
               accessibilityRole="button"
               accessibilityLabel="Close"

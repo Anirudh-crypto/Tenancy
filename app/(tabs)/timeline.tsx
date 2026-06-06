@@ -15,6 +15,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui';
+import { useActiveProperty } from '@/hooks/useActiveProperty';
 import { useStore } from '@/lib/store';
 import type { TimelineEvent, TimelineType } from '@/lib/types';
 
@@ -63,6 +64,7 @@ function Row({ event, index, isLast }: { event: TimelineEvent; index: number; is
 }
 
 export default function TimelineScreen() {
+  useActiveProperty();
   const timeline = useStore((s) => s.timeline);
 
   return (

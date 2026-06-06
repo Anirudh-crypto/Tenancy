@@ -35,11 +35,6 @@ export default function SignUpScreen() {
       setError(result.error);
       return;
     }
-    if (result.needsVerification) {
-      toast({ title: 'Check your email for a code', variant: 'success' });
-      router.push({ pathname: '/verify', params: { email: email.trim().toLowerCase() } });
-      return;
-    }
     toast({ title: 'Account created', variant: 'success' });
     router.replace('/(tabs)');
   };

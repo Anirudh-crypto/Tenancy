@@ -4,20 +4,19 @@ import {
   ArrowRight,
   Building2,
   CalendarClock,
-  LogOut,
-  MapPin,
-  Plus,
+  ChevronLeft,
+  Info,
   ShieldAlert,
   Wrench,
 } from 'lucide-react-native';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RiskBadge } from '@/components/StatusBadges';
-import { Avatar, AvatarFallback, Badge, Button, Card, CardContent, Separator, Skeleton, Text } from '@/components/ui';
+import { Badge, Button, Card, CardContent, Separator, Text } from '@/components/ui';
+import { useActiveProperty } from '@/hooks/useActiveProperty';
 import { useStore } from '@/lib/store';
-import type { Property } from '@/lib/types';
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -35,283 +34,6 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
           </Text>
         ) : null}
       </CardContent>
-    </Card>
-  );
-}
-
-export default function HomeScreen() {
-  const property = useStore((s) => s.property);
-  const properties = useStore((s) => s.properties);
-  const propertiesLoading = useStore((s) => s.propertiesLoading);
-  const tickets = useStore((s) => s.tickets);
-  const risks = useStore((s) => s.risks);
-  const role = useStore((s) => s.role);
-  const user = useStore((s) => s.user);
-  const signOut = useStore((s) => s.signOut);
-
-  const openTickets = tickets.filter((t) => t.status !== 'resolved');
-  const topRisk = [...risks].toSorted((a, b) =>
-    a.level === 'high' ? -1 : b.level === 'high' ? 1 : 0
-  )[0];
-
-  const displayName = user?.name ?? (role === 'tenant' ? property.tenantName : property.landlordName);
-  const initials = displayName
-    .split(' ')
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
-  return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScrollView contentContainerClassName="px-5 pb-10 pt-2" showsVerticalScrollIndicator={false}>
-        {/* Signed-in identity */}
-        <View className="flex-row items-center gap-3 py-2">
-          <Avatar size="lg" className="bg-primary">
-            <AvatarFallback className="bg-primary">
-              <Text weight="bold" className="text-primary-foreground">
-                {initials}
-              </Text>
-            </AvatarFallback>
-          </Avatar>
-          <View className="flex-1">
-            <View className="flex-row items-center gap-2">
-              <Text weight="bold" size="lg">
-                {displayName}
-              </Text>
-              <Badge variant={role === 'landlord' ? 'default' : 'secondary'}>
-                <Text size="xs" weight="semibold">
-                  {role === 'tenant' ? 'Tenant' : 'Landlord'}
-                </Text>
-              </Badge>
-            </View>
-            <Text size="sm" variant="muted">
-              {user?.email ?? property.address}
-            </Text>
-          </View>
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel="Sign out"
-            onPress={() => {
-              void signOut();
-              router.replace('/login');
-            }}>
-            <LogOut size={20} className="text-muted-foreground" />
-          </Button>
-        </View>
-
-        {/* Tenant: property overview, stats, risk callout */}
-        {role === 'tenant' ? (
-          <>
-            <View className="mt-2">
-              <Text size="sm" variant="muted" weight="medium">
-                TenancyOS
-              </Text>
-              <Text size="2xl" weight="bold">
-                {property.name}
-              </Text>
-              <Text size="sm" variant="muted">
-                {property.address}, {property.city}
-              </Text>
-            </View>
-
-            <View className="mt-4 flex-row gap-3">
-              <StatCard label="Monthly rent" value={`€${property.rent}`} />
-              <StatCard label="Deposit held" value={`€${property.deposit}`} />
-            </View>
-            <View className="mt-3 flex-row gap-3">
-              <StatCard
-                label="Open tickets"
-                value={`${openTickets.length}`}
-                sub={openTickets.length ? 'Needs attention' : 'All clear'}
-              />
-              <StatCard
-                label="Tenancy age"
-                value={`${Math.round(
-                  (Date.now() - new Date(property.moveInDate).getTime()) /
-                    (1000 * 60 * 60 * 24 * 30)
-                )} mo`}
-              />
-            </View>
-
-            {topRisk ? (
-              <Animated.View entering={FadeInDown.delay(80)}>
-                <Card className="mt-5 border-l-4 border-l-destructive">
-                  <CardContent className="gap-2 py-4">
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center gap-2">
-                        <ShieldAlert size={18} className="text-destructive" />
-                        <Text weight="semibold" size="sm">
-                          AI Risk Prediction
-                        </Text>
-                      </View>
-                      <RiskBadge level={topRisk.level} />
-                    </View>
-                    <Text weight="semibold">{topRisk.title}</Text>
-                    <Text size="sm" variant="muted">
-                      {topRisk.rationale}
-                    </Text>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-1 self-start"
-                      onPress={() => router.push('/(tabs)/risks')}>
-                      <Text size="sm" weight="semibold">
-                        View all risks
-                      </Text>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Animated.View>
-            ) : null}
-
-            <Text size="sm" weight="semibold" variant="muted" className="mb-2 mt-6">
-              QUICK ACTIONS
-            </Text>
-            <View className="gap-3">
-              <ActionRow
-                icon={<Wrench size={20} className="text-primary" />}
-                title="Report an issue"
-                sub="AI triages urgency & legal timelines"
-                onPress={() => router.push('/ticket/new')}
-              />
-              <ActionRow
-                icon={<CalendarClock size={20} className="text-primary" />}
-                title="View tenancy timeline"
-                sub="Single source of truth for every event"
-                onPress={() => router.push('/(tabs)/timeline')}
-              />
-            </View>
-
-            <Separator className="my-6" />
-            <Text size="xs" variant="muted" className="text-center">
-              Move-in {formatDistanceToNow(new Date(property.moveInDate), { addSuffix: true })}
-            </Text>
-          </>
-        ) : null}
-
-        {/* Landlord: property portfolio only */}
-        {role === 'landlord' ? (
-          <Animated.View entering={FadeInDown.delay(120)}>
-            <View className="mb-2 mt-6 flex-row items-center justify-between">
-              <Text size="sm" weight="semibold" variant="muted">
-                MY PROPERTIES
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Add property"
-                hitSlop={8}
-                className="min-h-[36px] flex-row items-center gap-1 rounded-md bg-primary px-3 py-1.5 active:opacity-80"
-                onPress={() => router.push('/property/new')}>
-                <Plus size={15} className="text-primary-foreground" />
-                <Text size="xs" weight="semibold" className="text-primary-foreground">
-                  Add
-                </Text>
-              </Pressable>
-            </View>
-            {propertiesLoading && properties.length === 0 ? (
-              <View className="gap-3">
-                <Skeleton className="h-28 w-full rounded-xl" />
-                <Skeleton className="h-28 w-full rounded-xl" />
-              </View>
-            ) : properties.length > 0 ? (
-              <View className="gap-3">
-                {properties.map((p) => (
-                  <PropertyCard key={p.id} property={p} />
-                ))}
-              </View>
-            ) : (
-              <Card>
-                <CardContent className="items-center gap-3 py-8">
-                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                    <Building2 size={26} className="text-primary" />
-                  </View>
-                  <Text weight="semibold">No properties yet</Text>
-                  <Text size="sm" variant="muted" className="text-center">
-                    Add your first property to start tracking rent, deposits, and tenants.
-                  </Text>
-                  <Button size="sm" className="mt-1" onPress={() => router.push('/property/new')}>
-                    <View className="flex-row items-center gap-1.5">
-                      <Plus size={15} className="text-primary-foreground" />
-                      <Text size="sm" weight="semibold" className="text-primary-foreground">
-                        Add property
-                      </Text>
-                    </View>
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </Animated.View>
-        ) : null}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function PropertyCard({ property }: { property: Property }) {
-  const tenantSummary =
-    property.tenants.length > 0
-      ? property.tenants.map((t) => t.name).join(', ')
-      : 'No current tenant';
-  return (
-    <Card>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${property.name}`}
-        className="active:opacity-70"
-        onPress={() => router.push(`/property/${property.id}`)}>
-        <CardContent className="gap-3 py-4">
-          <View className="flex-row items-center gap-3">
-            <View className="h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-              <Building2 size={22} className="text-primary" />
-            </View>
-            <View className="flex-1">
-              <View className="flex-row items-center gap-2">
-                <Text weight="semibold" className="flex-1" numberOfLines={1}>
-                  {property.name}
-                </Text>
-                <Badge variant={property.status === 'occupied' ? 'default' : 'secondary'}>
-                  <Text size="xs" weight="semibold">
-                    {property.status === 'occupied' ? 'Occupied' : 'Vacant'}
-                  </Text>
-                </Badge>
-              </View>
-              <View className="mt-0.5 flex-row items-center gap-1">
-                <MapPin size={13} className="text-muted-foreground" />
-                <Text size="xs" variant="muted" numberOfLines={1} className="flex-1">
-                  {property.address}, {property.city}
-                </Text>
-              </View>
-            </View>
-            <ArrowRight size={18} className="text-muted-foreground" />
-          </View>
-          <Separator />
-          <View className="flex-row items-center justify-between">
-            <View>
-              <Text size="xs" variant="muted">
-                Rent
-              </Text>
-              <Text weight="semibold">€{property.rent.toLocaleString()}</Text>
-            </View>
-            <View>
-              <Text size="xs" variant="muted">
-                {property.bedrooms} bd · {property.bathrooms} ba
-              </Text>
-              <Text size="sm">{property.sizeSqm} m²</Text>
-            </View>
-            <View className="max-w-[45%] items-end">
-              <Text size="xs" variant="muted">
-                Tenant
-              </Text>
-              <Text size="sm" numberOfLines={1}>
-                {tenantSummary}
-              </Text>
-            </View>
-          </View>
-        </CardContent>
-      </Pressable>
     </Card>
   );
 }
@@ -344,5 +66,155 @@ function ActionRow({
         </View>
       </Button>
     </Card>
+  );
+}
+
+export default function HomeScreen() {
+  const { activePropertyId } = useActiveProperty();
+  const property = useStore((s) =>
+    activePropertyId ? s.getProperty(activePropertyId) : undefined
+  );
+  const tickets = useStore((s) => s.tickets);
+  const risks = useStore((s) => s.risks);
+  const role = useStore((s) => s.role);
+  const clearActiveProperty = useStore((s) => s.clearActiveProperty);
+
+  if (!property) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center bg-background" edges={['top']}>
+        <Text variant="muted">Loading property…</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const openTickets = tickets.filter((t) => t.status !== 'resolved');
+  const topRisk = [...risks].toSorted((a, b) =>
+    a.level === 'high' ? -1 : b.level === 'high' ? 1 : 0
+  )[0];
+  const moveInMonths = Math.round(
+    (Date.now() - new Date(property.moveInDate).getTime()) / (1000 * 60 * 60 * 24 * 30)
+  );
+
+  return (
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+      <ScrollView contentContainerClassName="px-5 pb-10 pt-2" showsVerticalScrollIndicator={false}>
+        {/* Switch property (landlords manage multiple) */}
+        {role === 'landlord' ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-2 mb-1 mt-1 self-start"
+            onPress={() => {
+              clearActiveProperty();
+              router.replace('/properties');
+            }}>
+            <View className="flex-row items-center gap-1">
+              <ChevronLeft size={16} className="text-muted-foreground" />
+              <Text size="sm" variant="muted" weight="medium">
+                All properties
+              </Text>
+            </View>
+          </Button>
+        ) : null}
+
+        {/* Property header */}
+        <View className="mt-1 flex-row items-start gap-3">
+          <View className="h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+            <Building2 size={26} className="text-primary" />
+          </View>
+          <View className="flex-1">
+            <View className="flex-row items-center gap-2">
+              <Text size="2xl" weight="bold" className="flex-1" numberOfLines={1}>
+                {property.name}
+              </Text>
+              <Badge variant={property.status === 'occupied' ? 'default' : 'secondary'}>
+                <Text size="xs" weight="semibold">
+                  {property.status === 'occupied' ? 'Occupied' : 'Vacant'}
+                </Text>
+              </Badge>
+            </View>
+            <Text size="sm" variant="muted">
+              {property.address}, {property.city}
+            </Text>
+          </View>
+        </View>
+
+        {/* Stats */}
+        <View className="mt-4 flex-row gap-3">
+          <StatCard label="Monthly rent" value={`€${property.rent.toLocaleString()}`} />
+          <StatCard label="Deposit held" value={`€${property.deposit.toLocaleString()}`} />
+        </View>
+        <View className="mt-3 flex-row gap-3">
+          <StatCard
+            label="Open tickets"
+            value={`${openTickets.length}`}
+            sub={openTickets.length ? 'Needs attention' : 'All clear'}
+          />
+          <StatCard label="Tenancy age" value={`${moveInMonths} mo`} />
+        </View>
+
+        {/* Risk callout */}
+        {topRisk ? (
+          <Animated.View entering={FadeInDown.delay(80)}>
+            <Card className="mt-5 border-l-4 border-l-destructive">
+              <CardContent className="gap-2 py-4">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center gap-2">
+                    <ShieldAlert size={18} className="text-destructive" />
+                    <Text weight="semibold" size="sm">
+                      AI Risk Prediction
+                    </Text>
+                  </View>
+                  <RiskBadge level={topRisk.level} />
+                </View>
+                <Text weight="semibold">{topRisk.title}</Text>
+                <Text size="sm" variant="muted">
+                  {topRisk.rationale}
+                </Text>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 self-start"
+                  onPress={() => router.push('/(tabs)/risks')}>
+                  <Text size="sm" weight="semibold">
+                    View all risks
+                  </Text>
+                </Button>
+              </CardContent>
+            </Card>
+          </Animated.View>
+        ) : null}
+
+        {/* Quick actions */}
+        <Text size="sm" weight="semibold" variant="muted" className="mb-2 mt-6">
+          QUICK ACTIONS
+        </Text>
+        <View className="gap-3">
+          <ActionRow
+            icon={<Info size={20} className="text-primary" />}
+            title="Property details"
+            sub="Rent, deposit, layout & tenants"
+            onPress={() => router.push(`/property/${property.id}`)}
+          />
+          <ActionRow
+            icon={<Wrench size={20} className="text-primary" />}
+            title="Report an issue"
+            sub="AI triages urgency & legal timelines"
+            onPress={() => router.push('/ticket/new')}
+          />
+          <ActionRow
+            icon={<CalendarClock size={20} className="text-primary" />}
+            title="View tenancy timeline"
+            sub="Single source of truth for every event"
+            onPress={() => router.push('/(tabs)/timeline')}
+          />
+        </View>
+
+        <Separator className="my-6" />
+        <Text size="xs" variant="muted" className="text-center">
+          Move-in {formatDistanceToNow(new Date(property.moveInDate), { addSuffix: true })}
+        </Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

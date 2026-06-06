@@ -47,7 +47,10 @@ function Scanner() {
 export default function InspectionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const inspection = useStore((s) => s.inspections.find((i) => i.id === id));
-  const property = useStore((s) => s.property);
+  const property = useStore((s) => {
+    const active = s.activePropertyId ? s.getProperty(s.activePropertyId) : undefined;
+    return active ?? s.property;
+  });
   const role = useStore((s) => s.role);
   const addPhoto = useStore((s) => s.addInspectionPhoto);
   const sign = useStore((s) => s.signInspection);
@@ -82,7 +85,7 @@ export default function InspectionDetailScreen() {
       // Placeholder image — real implementation would use expo-image-picker / expo-camera.
       // TODO: wire expo-camera capture; using a deterministic placeholder URI for the demo.
       const uri = `https://picsum.photos/seed/${room}-${Date.now()}/600/400`;
-      addPhoto(inspection.id, room, uri, damages);
+      void addPhoto(inspection.id, room, uri, damages);
       setScanningRoom(null);
       toast({
         title: `${roomLabel(room)} analyzed · ${damages.length} finding(s)`,

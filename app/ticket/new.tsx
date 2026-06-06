@@ -46,9 +46,16 @@ export default function NewTicketScreen() {
   };
 
   const onSubmit = (values: FormValues) => {
-    addTicket(values);
-    toast({ title: 'Ticket created & logged to timeline', variant: 'success' });
-    router.back();
+    void (async () => {
+      const created = await addTicket(values);
+      if (!created) {
+        toast({ title: 'Could not save ticket. Try again.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Ticket created & logged to timeline', variant: 'success' });
+      if (router.canGoBack()) router.back();
+      else router.replace('/(tabs)/tickets');
+    })();
   };
 
   return (

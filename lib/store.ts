@@ -7,9 +7,15 @@ import {
   ensureProfile,
   fetchProfile,
   fetchProperties,
+  fetchPropertyData,
+  insertInspection,
   insertProperty,
+  insertTicket,
+  insertTimelineEvent,
   type NewPropertyInput,
   supabase,
+  updateInspection,
+  updateTicket,
 } from './supabase';
 import type {
   DetectedDamage,
@@ -32,8 +38,16 @@ function iso(daysAgo: number): string {
   return d.toISOString();
 }
 
+/**
+ * The tenant demo property. It is NOT a row in the `properties` table, so its
+ * tickets/timeline/inspections/risks are kept in-memory (and persisted via
+ * AsyncStorage) rather than written to Supabase. Landlord-created properties
+ * are DB-backed and FK-safe.
+ */
+export const SEED_PROPERTY_ID = 'prop_1';
+
 const SEED_PROPERTY: Property = {
-  id: 'prop_1',
+  id: SEED_PROPERTY_ID,
   name: 'Altbau · 3 Zimmer',
   address: 'Schönhauser Allee 142',
   city: 'Berlin',
@@ -62,17 +76,18 @@ const SEED_PROPERTY: Property = {
 };
 
 const SEED_TIMELINE: TimelineEvent[] = [
-  { id: 't1', type: 'move_in', title: 'Move-in completed', detail: 'Signed move-in report with 6 documented pre-existing items.', at: iso(420), actor: 'system' },
-  { id: 't2', type: 'agreement', title: 'House rules acknowledged', detail: 'Quiet hours 22:00–06:00, shared cleaning rota agreed.', at: iso(418), actor: 'tenant' },
-  { id: 't3', type: 'maintenance', title: 'Dishwasher not draining', detail: 'Reported and resolved within 5 days.', at: iso(300), actor: 'tenant' },
-  { id: 't4', type: 'inspection', title: 'Annual inspection visit', detail: 'No issues noted. Photos archived.', at: iso(180), actor: 'landlord' },
-  { id: 't5', type: 'maintenance', title: 'Mold spots in bathroom', detail: 'Reported. Ventilation advice given, not yet remediated.', at: iso(60), actor: 'tenant' },
-  { id: 't6', type: 'maintenance', title: 'Mold spots returned', detail: 'Second report of mold in same location.', at: iso(12), actor: 'tenant' },
+  { id: 't1', propertyId: SEED_PROPERTY_ID, type: 'move_in', title: 'Move-in completed', detail: 'Signed move-in report with 6 documented pre-existing items.', at: iso(420), actor: 'system' },
+  { id: 't2', propertyId: SEED_PROPERTY_ID, type: 'agreement', title: 'House rules acknowledged', detail: 'Quiet hours 22:00–06:00, shared cleaning rota agreed.', at: iso(418), actor: 'tenant' },
+  { id: 't3', propertyId: SEED_PROPERTY_ID, type: 'maintenance', title: 'Dishwasher not draining', detail: 'Reported and resolved within 5 days.', at: iso(300), actor: 'tenant' },
+  { id: 't4', propertyId: SEED_PROPERTY_ID, type: 'inspection', title: 'Annual inspection visit', detail: 'No issues noted. Photos archived.', at: iso(180), actor: 'landlord' },
+  { id: 't5', propertyId: SEED_PROPERTY_ID, type: 'maintenance', title: 'Mold spots in bathroom', detail: 'Reported. Ventilation advice given, not yet remediated.', at: iso(60), actor: 'tenant' },
+  { id: 't6', propertyId: SEED_PROPERTY_ID, type: 'maintenance', title: 'Mold spots returned', detail: 'Second report of mold in same location.', at: iso(12), actor: 'tenant' },
 ];
 
 const SEED_TICKETS: Ticket[] = [
   {
     id: 'tkt_seed_1',
+    propertyId: SEED_PROPERTY_ID,
     title: 'Bathroom mold returning',
     description: 'Black mold on the grout near the shower has come back even after cleaning.',
     category: 'Moisture / Mold',
@@ -88,6 +103,7 @@ const SEED_TICKETS: Ticket[] = [
   },
   {
     id: 'tkt_seed_2',
+    propertyId: SEED_PROPERTY_ID,
     title: 'Kitchen window won’t lock',
     description: 'The handle spins freely and the window does not lock shut.',
     category: 'Security / Fixtures',
@@ -104,6 +120,7 @@ const SEED_TICKETS: Ticket[] = [
 const SEED_RISKS: RiskSignal[] = [
   {
     id: 'risk_1',
+    propertyId: SEED_PROPERTY_ID,
     title: 'High probability of moisture damage within 6 months',
     level: 'high',
     category: 'moisture',
@@ -112,6 +129,7 @@ const SEED_RISKS: RiskSignal[] = [
   },
   {
     id: 'risk_2',
+    propertyId: SEED_PROPERTY_ID,
     title: 'Deposit dispute risk: Medium',
     level: 'medium',
     category: 'deposit',
@@ -120,14 +138,33 @@ const SEED_RISKS: RiskSignal[] = [
   },
 ];
 
-interface State {
-  property: Property;
-  properties: Property[];
-  propertiesLoading: boolean;
+/** The seed property's data is held here so the tenant demo keeps working offline. */
+interface SeedData {
   tickets: Ticket[];
   timeline: TimelineEvent[];
   inspections: Inspection[];
   risks: RiskSignal[];
+}
+
+interface State {
+  /** The tenant's single demo property (also seeds the seed-data store below). */
+  property: Property;
+  /** Landlord-owned, DB-backed properties. */
+  properties: Property[];
+  propertiesLoading: boolean;
+
+  /** The property whose tabs are currently shown. null = none open. */
+  activePropertyId: string | null;
+  /** Data for the active property only (loaded from DB, or seed for the demo property). */
+  tickets: Ticket[];
+  timeline: TimelineEvent[];
+  inspections: Inspection[];
+  risks: RiskSignal[];
+  propertyDataLoading: boolean;
+
+  /** In-memory store for the seed (tenant demo) property's data. */
+  seedData: SeedData;
+
   role: 'tenant' | 'landlord';
   hydrated: boolean;
 
@@ -143,12 +180,7 @@ interface State {
     email: string;
     password: string;
     role: Role;
-  }) => Promise<{ ok: true; needsVerification: boolean } | { ok: false; error: string }>;
-  verifySignup: (
-    email: string,
-    token: string
-  ) => Promise<{ ok: true } | { ok: false; error: string }>;
-  resendSignupCode: (email: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  }) => Promise<{ ok: true } | { ok: false; error: string }>;
   requestPasswordReset: (
     email: string
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
@@ -165,22 +197,32 @@ interface State {
   addProperty: (
     input: NewPropertyInput
   ) => Promise<{ ok: true; id: string } | { ok: false; error: string }>;
-  addTicket: (input: { title: string; description: string }) => Ticket;
-  respondToTicket: (ticketId: string, text: string) => void;
-  setTicketStatus: (ticketId: string, status: Ticket['status']) => void;
-  addTimelineEvent: (e: Omit<TimelineEvent, 'id' | 'at'> & { at?: string }) => void;
 
-  createInspection: (kind: InspectionKind) => string;
+  /** Open a property: set it active and load its scoped data. */
+  setActiveProperty: (id: string) => Promise<void>;
+  clearActiveProperty: () => void;
+  reloadActivePropertyData: () => Promise<void>;
+
+  addTicket: (input: { title: string; description: string }) => Promise<Ticket | null>;
+  respondToTicket: (ticketId: string, text: string) => Promise<void>;
+  setTicketStatus: (ticketId: string, status: Ticket['status']) => Promise<void>;
+  addTimelineEvent: (e: Omit<TimelineEvent, 'id' | 'at' | 'propertyId'> & { at?: string }) => Promise<void>;
+
+  createInspection: (kind: InspectionKind) => Promise<string | null>;
   addInspectionPhoto: (
     inspectionId: string,
     room: RoomKey,
     uri: string,
     damages: DetectedDamage[]
-  ) => void;
-  signInspection: (inspectionId: string, signedBy: string) => void;
+  ) => Promise<void>;
+  signInspection: (inspectionId: string, signedBy: string) => Promise<void>;
 }
 
-function timelineForTicket(t: Ticket): Omit<TimelineEvent, 'id' | 'at'> {
+function isSeed(id: string | null): boolean {
+  return id === SEED_PROPERTY_ID;
+}
+
+function timelineForTicket(t: Ticket): Omit<TimelineEvent, 'id' | 'at' | 'propertyId'> {
   return {
     type: 'maintenance' as TimelineType,
     title: `Reported: ${t.title}`,
@@ -195,10 +237,21 @@ export const useStore = create<State>()(
       property: SEED_PROPERTY,
       properties: [],
       propertiesLoading: false,
-      tickets: SEED_TICKETS,
-      timeline: SEED_TIMELINE,
+
+      activePropertyId: null,
+      tickets: [],
+      timeline: [],
       inspections: [],
-      risks: SEED_RISKS,
+      risks: [],
+      propertyDataLoading: false,
+
+      seedData: {
+        tickets: SEED_TICKETS,
+        timeline: SEED_TIMELINE,
+        inspections: [],
+        risks: SEED_RISKS,
+      },
+
       role: 'tenant',
       hydrated: false,
 
@@ -214,6 +267,8 @@ export const useStore = create<State>()(
               set({ user: profile, role: profile.role });
               if (profile.role === 'landlord') {
                 void get().loadProperties();
+              } else {
+                void get().setActiveProperty(SEED_PROPERTY_ID);
               }
             }
           }
@@ -223,10 +278,9 @@ export const useStore = create<State>()(
           set({ hydrated: true });
         }
 
-        // Keep store in sync with auth state changes (token refresh, sign out, etc.)
         supabase.auth.onAuthStateChange((_event, session) => {
           if (!session?.user) {
-            set({ user: null, properties: [] });
+            set({ user: null, properties: [], activePropertyId: null });
             return;
           }
           void (async () => {
@@ -235,6 +289,8 @@ export const useStore = create<State>()(
               set({ user: profile, role: profile.role });
               if (profile.role === 'landlord') {
                 void get().loadProperties();
+              } else {
+                void get().setActiveProperty(SEED_PROPERTY_ID);
               }
             }
           })();
@@ -257,6 +313,8 @@ export const useStore = create<State>()(
         set({ user: profile, role: profile.role });
         if (profile.role === 'landlord') {
           void get().loadProperties();
+        } else {
+          void get().setActiveProperty(SEED_PROPERTY_ID);
         }
         return { ok: true };
       },
@@ -276,39 +334,30 @@ export const useStore = create<State>()(
         if (error) {
           return { ok: false, error: error.message };
         }
-        // If email confirmation is required, there is no active session yet.
-        const needsVerification = !data.session;
-        if (data.session && data.user) {
-          const profile = await fetchProfile(data.user.id);
-          if (profile) set({ user: profile, role: profile.role });
-        }
-        return { ok: true, needsVerification };
-      },
 
-      verifySignup: async (email, token) => {
-        const normalized = email.trim().toLowerCase();
-        const { data, error } = await supabase.auth.verifyOtp({
-          email: normalized,
-          token: token.trim(),
-          type: 'signup',
-        });
-        if (error || !data.user) {
-          return { ok: false, error: error?.message ?? 'Invalid or expired code.' };
-        }
-        const profile = await ensureProfile();
-        if (profile) {
-          set({ user: profile, role: profile.role });
-          if (profile.role === 'landlord') {
-            void get().loadProperties();
+        // Email confirmation is disabled — no OTP step. If the project still
+        // returned no session (confirmation enabled server-side), sign in with
+        // the password we just set to obtain one immediately.
+        if (!data.session) {
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: normalized,
+            password,
+          });
+          if (signInError) {
+            return { ok: false, error: signInError.message };
           }
         }
-        return { ok: true };
-      },
 
-      resendSignupCode: async (email) => {
-        const normalized = email.trim().toLowerCase();
-        const { error } = await supabase.auth.resend({ type: 'signup', email: normalized });
-        if (error) return { ok: false, error: error.message };
+        const profile = await ensureProfile();
+        if (!profile) {
+          return { ok: false, error: 'Could not create your profile. Please try again.' };
+        }
+        set({ user: profile, role: profile.role });
+        if (profile.role === 'landlord') {
+          void get().loadProperties();
+        } else {
+          void get().setActiveProperty(SEED_PROPERTY_ID);
+        }
         return { ok: true };
       },
 
@@ -317,7 +366,6 @@ export const useStore = create<State>()(
         if (!normalized.includes('@')) {
           return { ok: false, error: 'Enter a valid email address.' };
         }
-        // Sends a 6-digit recovery code (no redirect link).
         const { error } = await supabase.auth.resetPasswordForEmail(normalized);
         if (error) return { ok: false, error: error.message };
         return { ok: true };
@@ -349,11 +397,12 @@ export const useStore = create<State>()(
 
       signOut: async () => {
         await supabase.auth.signOut();
-        set({ user: null, properties: [] });
+        set({ user: null, properties: [], activePropertyId: null });
       },
 
       setRole: (role) => set({ role }),
-      getProperty: (id) => get().properties.find((p) => p.id === id),
+      getProperty: (id) =>
+        id === SEED_PROPERTY_ID ? get().property : get().properties.find((p) => p.id === id),
 
       loadProperties: async () => {
         const user = get().user;
@@ -376,108 +425,201 @@ export const useStore = create<State>()(
         return { ok: true, id: result.property.id };
       },
 
-      addTicket: ({ title, description }) => {
+      setActiveProperty: async (id) => {
+        set({ activePropertyId: id, propertyDataLoading: true });
+        try {
+          if (isSeed(id)) {
+            const seed = get().seedData;
+            set({
+              tickets: seed.tickets,
+              timeline: seed.timeline,
+              inspections: seed.inspections,
+              risks: seed.risks,
+            });
+          } else {
+            const data = await fetchPropertyData(id);
+            set({
+              tickets: data.tickets,
+              timeline: data.timeline,
+              inspections: data.inspections,
+              risks: data.risks,
+            });
+          }
+        } finally {
+          set({ propertyDataLoading: false });
+        }
+      },
+
+      clearActiveProperty: () =>
+        set({ activePropertyId: null, tickets: [], timeline: [], inspections: [], risks: [] }),
+
+      reloadActivePropertyData: async () => {
+        const id = get().activePropertyId;
+        if (id) await get().setActiveProperty(id);
+      },
+
+      addTicket: async ({ title, description }) => {
+        const propertyId = get().activePropertyId;
+        if (!propertyId) return null;
         const triage = triageTicket(`${title} ${description}`);
-        const ticket: Ticket = {
-          id: genId('tkt'),
+        const base: Omit<Ticket, 'id' | 'propertyId' | 'createdAt'> = {
           title,
           description,
           category: triage.category,
           urgency: triage.urgency,
           status: 'open',
-          createdAt: new Date().toISOString(),
           reporter: get().role,
           legalDeadline: triage.legalDeadline,
           legalNote: triage.legalNote,
           responses: [],
         };
-        set((s) => ({ tickets: [ticket, ...s.tickets] }));
-        get().addTimelineEvent(timelineForTicket(ticket));
+
+        let ticket: Ticket;
+        if (isSeed(propertyId)) {
+          ticket = { ...base, id: genId('tkt'), propertyId, createdAt: new Date().toISOString() };
+          set((s) => ({
+            tickets: [ticket, ...s.tickets],
+            seedData: { ...s.seedData, tickets: [ticket, ...s.seedData.tickets] },
+          }));
+        } else {
+          const saved = await insertTicket(propertyId, base);
+          if (!saved) return null;
+          ticket = saved;
+          set((s) => ({ tickets: [ticket, ...s.tickets] }));
+        }
+        await get().addTimelineEvent(timelineForTicket(ticket));
         return ticket;
       },
 
-      respondToTicket: (ticketId, text) =>
-        set((s) => ({
-          tickets: s.tickets.map((t) =>
-            t.id === ticketId
-              ? {
-                  ...t,
-                  status: t.status === 'open' ? 'acknowledged' : t.status,
-                  responses: [
-                    ...t.responses,
-                    { id: genId('resp'), author: s.role, text, at: new Date().toISOString() },
-                  ],
-                }
-              : t
-          ),
-        })),
+      respondToTicket: async (ticketId, text) => {
+        const propertyId = get().activePropertyId;
+        const role = get().role;
+        const ticket = get().tickets.find((t) => t.id === ticketId);
+        if (!ticket) return;
+        const nextResponses = [
+          ...ticket.responses,
+          { id: genId('resp'), author: role, text, at: new Date().toISOString() },
+        ];
+        const nextStatus = ticket.status === 'open' ? 'acknowledged' : ticket.status;
 
-      setTicketStatus: (ticketId, status) =>
-        set((s) => ({
-          tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, status } : t)),
-        })),
+        const apply = (t: Ticket): Ticket =>
+          t.id === ticketId ? { ...t, status: nextStatus, responses: nextResponses } : t;
 
-      addTimelineEvent: (e) =>
-        set((s) => ({
-          timeline: [
-            { id: genId('tl'), at: e.at ?? new Date().toISOString(), ...e },
-            ...s.timeline,
-          ],
-        })),
-
-      createInspection: (kind) => {
-        const id = genId('insp');
-        const inspection: Inspection = {
-          id,
-          kind,
-          createdAt: new Date().toISOString(),
-          photos: [],
-        };
-        set((s) => ({ inspections: [inspection, ...s.inspections] }));
-        return id;
+        if (isSeed(propertyId)) {
+          set((s) => ({
+            tickets: s.tickets.map(apply),
+            seedData: { ...s.seedData, tickets: s.seedData.tickets.map(apply) },
+          }));
+        } else {
+          set((s) => ({ tickets: s.tickets.map(apply) }));
+          await updateTicket(ticketId, { status: nextStatus, responses: nextResponses });
+        }
       },
 
-      addInspectionPhoto: (inspectionId, room, uri, damages) =>
-        set((s) => ({
-          inspections: s.inspections.map((i) =>
-            i.id === inspectionId
-              ? {
-                  ...i,
-                  photos: [
-                    ...i.photos,
-                    {
-                      id: genId('photo'),
-                      room,
-                      uri,
-                      capturedAt: new Date().toISOString(),
-                      damages,
-                    } as InspectionPhoto,
-                  ],
-                }
-              : i
-          ),
-        })),
-
-      signInspection: (inspectionId, signedBy) => {
-        const insp = get().inspections.find((i) => i.id === inspectionId);
-        set((s) => ({
-          inspections: s.inspections.map((i) =>
-            i.id === inspectionId
-              ? { ...i, signedAt: new Date().toISOString(), signedBy }
-              : i
-          ),
-        }));
-        if (insp) {
-          get().addTimelineEvent({
-            type: insp.kind === 'move_in' ? 'move_in' : 'move_out',
-            title:
-              insp.kind === 'move_in'
-                ? 'Signed move-in report'
-                : 'Signed move-out report',
-            detail: `${insp.photos.length} rooms documented · signed by ${signedBy}`,
-            actor: get().role,
-          });
+      setTicketStatus: async (ticketId, status) => {
+        const propertyId = get().activePropertyId;
+        const apply = (t: Ticket): Ticket => (t.id === ticketId ? { ...t, status } : t);
+        if (isSeed(propertyId)) {
+          set((s) => ({
+            tickets: s.tickets.map(apply),
+            seedData: { ...s.seedData, tickets: s.seedData.tickets.map(apply) },
+          }));
+        } else {
+          set((s) => ({ tickets: s.tickets.map(apply) }));
+          await updateTicket(ticketId, { status });
         }
+      },
+
+      addTimelineEvent: async (e) => {
+        const propertyId = get().activePropertyId;
+        if (!propertyId) return;
+        const at = e.at ?? new Date().toISOString();
+        if (isSeed(propertyId)) {
+          const event: TimelineEvent = { id: genId('tl'), propertyId, at, ...e };
+          set((s) => ({
+            timeline: [event, ...s.timeline],
+            seedData: { ...s.seedData, timeline: [event, ...s.seedData.timeline] },
+          }));
+        } else {
+          const saved = await insertTimelineEvent(propertyId, { ...e, at });
+          if (saved) set((s) => ({ timeline: [saved, ...s.timeline] }));
+        }
+      },
+
+      createInspection: async (kind) => {
+        const propertyId = get().activePropertyId;
+        if (!propertyId) return null;
+        if (isSeed(propertyId)) {
+          const id = genId('insp');
+          const inspection: Inspection = {
+            id,
+            propertyId,
+            kind,
+            createdAt: new Date().toISOString(),
+            photos: [],
+          };
+          set((s) => ({
+            inspections: [inspection, ...s.inspections],
+            seedData: { ...s.seedData, inspections: [inspection, ...s.seedData.inspections] },
+          }));
+          return id;
+        }
+        const saved = await insertInspection(propertyId, kind);
+        if (!saved) return null;
+        set((s) => ({ inspections: [saved, ...s.inspections] }));
+        return saved.id;
+      },
+
+      addInspectionPhoto: async (inspectionId, room, uri, damages) => {
+        const propertyId = get().activePropertyId;
+        const insp = get().inspections.find((i) => i.id === inspectionId);
+        if (!insp) return;
+        const photo: InspectionPhoto = {
+          id: genId('photo'),
+          room,
+          uri,
+          capturedAt: new Date().toISOString(),
+          damages,
+        };
+        const nextPhotos = [...insp.photos, photo];
+        const apply = (i: Inspection): Inspection =>
+          i.id === inspectionId ? { ...i, photos: nextPhotos } : i;
+
+        if (isSeed(propertyId)) {
+          set((s) => ({
+            inspections: s.inspections.map(apply),
+            seedData: { ...s.seedData, inspections: s.seedData.inspections.map(apply) },
+          }));
+        } else {
+          set((s) => ({ inspections: s.inspections.map(apply) }));
+          await updateInspection(inspectionId, { photos: nextPhotos });
+        }
+      },
+
+      signInspection: async (inspectionId, signedBy) => {
+        const propertyId = get().activePropertyId;
+        const insp = get().inspections.find((i) => i.id === inspectionId);
+        if (!insp) return;
+        const signedAt = new Date().toISOString();
+        const apply = (i: Inspection): Inspection =>
+          i.id === inspectionId ? { ...i, signedAt, signedBy } : i;
+
+        if (isSeed(propertyId)) {
+          set((s) => ({
+            inspections: s.inspections.map(apply),
+            seedData: { ...s.seedData, inspections: s.seedData.inspections.map(apply) },
+          }));
+        } else {
+          set((s) => ({ inspections: s.inspections.map(apply) }));
+          await updateInspection(inspectionId, { signedAt, signedBy });
+        }
+
+        await get().addTimelineEvent({
+          type: insp.kind === 'move_in' ? 'move_in' : 'move_out',
+          title: insp.kind === 'move_in' ? 'Signed move-in report' : 'Signed move-out report',
+          detail: `${insp.photos.length} rooms documented · signed by ${signedBy}`,
+          actor: get().role,
+        });
       },
     }),
     {
@@ -485,10 +627,7 @@ export const useStore = create<State>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         property: s.property,
-        tickets: s.tickets,
-        timeline: s.timeline,
-        inspections: s.inspections,
-        risks: s.risks,
+        seedData: s.seedData,
       }),
       onRehydrateStorage: () => () => {
         // Auth hydration (and the `hydrated` flag) is owned by initAuth() in _layout.

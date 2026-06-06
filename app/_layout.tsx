@@ -61,6 +61,8 @@ function useProtectedRoute() {
   const segments = useSegments();
   const router = useRouter();
   const user = useStore((s) => s.user);
+  const role = useStore((s) => s.role);
+  const activePropertyId = useStore((s) => s.activePropertyId);
   const hydrated = useStore((s) => s.hydrated);
 
   useEffect(() => {
@@ -68,15 +70,18 @@ function useProtectedRoute() {
     const inAuthGroup =
       segments[0] === 'login' ||
       segments[0] === 'signup' ||
-      segments[0] === 'verify' ||
       segments[0] === 'reset-password';
 
     if (!user && !inAuthGroup) {
       router.replace('/login');
     } else if (user && inAuthGroup) {
-      router.replace('/(tabs)');
+      // Landlords land on their property list; tenants go straight into their tabs.
+      router.replace(role === 'landlord' ? '/properties' : '/(tabs)');
+    } else if (user && role === 'landlord' && !activePropertyId && segments[0] === '(tabs)') {
+      // A landlord cannot use the property-scoped tabs without an open property.
+      router.replace('/properties');
     }
-  }, [user, hydrated, segments, router]);
+  }, [user, role, activePropertyId, hydrated, segments, router]);
 }
 
 export default function RootLayout() {
@@ -200,9 +205,9 @@ export default function RootLayout() {
             <Stack>
               <Stack.Screen name="login" options={{ headerShown: false }} />
               <Stack.Screen name="signup" options={{ headerShown: false }} />
-              <Stack.Screen name="verify" options={{ headerShown: false }} />
               <Stack.Screen name="reset-password" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="properties" options={{ headerShown: false }} />
               <Stack.Screen
                 name="ticket/new"
                 options={{ title: 'Report an issue', presentation: 'modal' }}

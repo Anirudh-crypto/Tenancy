@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { StatusPill, UrgencyBadge } from '@/components/StatusBadges';
 import { Button, Card, Text } from '@/components/ui';
+import { useActiveProperty } from '@/hooks/useActiveProperty';
 import { useStore } from '@/lib/store';
 import type { Ticket } from '@/lib/types';
 
@@ -49,6 +50,7 @@ function TicketRow({ ticket }: { ticket: Ticket }) {
 }
 
 export default function TicketsScreen() {
+  useActiveProperty();
   const tickets = useStore((s) => s.tickets);
 
   return (

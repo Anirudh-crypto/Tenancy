@@ -40,7 +40,7 @@ export default function TicketDetailScreen() {
 
   const sendReply = () => {
     if (reply.trim().length < 2) return;
-    respond(ticket.id, reply.trim());
+    void respond(ticket.id, reply.trim());
     setReply('');
     toast({ title: 'Reply added', variant: 'success' });
   };

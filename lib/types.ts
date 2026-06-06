@@ -35,6 +35,7 @@ export type InspectionKind = 'move_in' | 'move_out';
 
 export interface Inspection {
   id: string;
+  propertyId: string;
   kind: InspectionKind;
   createdAt: string;
   signedAt?: string;
@@ -44,6 +45,7 @@ export interface Inspection {
 
 export interface Ticket {
   id: string;
+  propertyId: string;
   title: string;
   description: string;
   category: string; // Heating, Plumbing, Electrical, etc.
@@ -68,6 +70,7 @@ export type TimelineType =
 
 export interface TimelineEvent {
   id: string;
+  propertyId: string;
   type: TimelineType;
   title: string;
   detail: string;
@@ -79,6 +82,7 @@ export type RiskLevel = 'high' | 'medium' | 'low';
 
 export interface RiskSignal {
   id: string;
+  propertyId: string;
   title: string;
   level: RiskLevel;
   rationale: string;

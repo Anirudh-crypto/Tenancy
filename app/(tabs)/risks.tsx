@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RiskBadge } from '@/components/StatusBadges';
 import { Card, CardContent, Text } from '@/components/ui';
+import { useActiveProperty } from '@/hooks/useActiveProperty';
 import { useStore } from '@/lib/store';
 import type { RiskSignal } from '@/lib/types';
 
@@ -58,6 +59,7 @@ function RiskCard({ risk, index }: { risk: RiskSignal; index: number }) {
 }
 
 export default function RisksScreen() {
+  useActiveProperty();
   const risks = useStore((s) => s.risks);
   const high = risks.filter((r) => r.level === 'high').length;
 
