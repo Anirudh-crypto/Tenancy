@@ -1,5 +1,5 @@
 import { format, formatDistanceToNow, isPast } from 'date-fns';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Gavel, Send } from 'lucide-react-native';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { StatusPill, UrgencyBadge } from '@/components/StatusBadges';
 import { Button, Card, CardContent, Input, Separator, Text, useToast } from '@/components/ui';
+import { goBackTo } from '@/lib/navigation';
 import { useStore } from '@/lib/store';
 import type { TicketStatus } from '@/lib/types';
 
@@ -52,7 +53,7 @@ export default function TicketDetailScreen() {
           title: 'Ticket',
           headerLeft: () => (
             <Pressable
-              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/tickets'))}
+              onPress={() => goBackTo('/(tabs)/tickets')}
               hitSlop={12}
               accessibilityRole="button"
               accessibilityLabel="Go back"

@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { Button, Card, CardContent, Input, Separator, Switch, Text, useToast } from '@/components/ui';
+import { goBackTo } from '@/lib/navigation';
 import { useStore } from '@/lib/store';
 
 const numericString = (label: string) =>
@@ -92,8 +93,7 @@ export default function NewPropertyScreen() {
       return;
     }
     toast({ title: 'Property added', variant: 'success' });
-    if (router.canGoBack()) router.back();
-    else router.replace('/properties');
+    goBackTo('/properties');
   };
 
   return (
@@ -103,7 +103,7 @@ export default function NewPropertyScreen() {
           title: 'Add property',
           headerLeft: () => (
             <Pressable
-              onPress={() => (router.canGoBack() ? router.back() : router.replace('/properties'))}
+              onPress={() => goBackTo('/properties')}
               hitSlop={12}
               accessibilityRole="button"
               accessibilityLabel="Close"

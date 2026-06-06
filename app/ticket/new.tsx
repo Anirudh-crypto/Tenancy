@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Sparkles, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { UrgencyBadge } from '@/components/StatusBadges';
 import { Button, Card, CardContent, Input, Text, useToast } from '@/components/ui';
 import { triageTicket } from '@/lib/ai';
+import { goBackTo } from '@/lib/navigation';
 import { useStore } from '@/lib/store';
 
 const schema = z.object({
@@ -53,8 +54,7 @@ export default function NewTicketScreen() {
         return;
       }
       toast({ title: 'Ticket created & logged to timeline', variant: 'success' });
-      if (router.canGoBack()) router.back();
-      else router.replace('/(tabs)/tickets');
+      goBackTo('/(tabs)/tickets');
     })();
   };
 
@@ -65,7 +65,7 @@ export default function NewTicketScreen() {
           title: 'Report an issue',
           headerLeft: () => (
             <Pressable
-              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/tickets'))}
+              onPress={() => goBackTo('/(tabs)/tickets')}
               hitSlop={12}
               accessibilityRole="button"
               accessibilityLabel="Close"

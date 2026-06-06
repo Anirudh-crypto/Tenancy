@@ -6,6 +6,7 @@ import {
   CalendarClock,
   ChevronLeft,
   Info,
+  LogOut,
   ShieldAlert,
   Wrench,
 } from 'lucide-react-native';
@@ -78,6 +79,7 @@ export default function HomeScreen() {
   const risks = useStore((s) => s.risks);
   const role = useStore((s) => s.role);
   const clearActiveProperty = useStore((s) => s.clearActiveProperty);
+  const signOut = useStore((s) => s.signOut);
 
   if (!property) {
     return (
@@ -137,6 +139,18 @@ export default function HomeScreen() {
               {property.address}, {property.city}
             </Text>
           </View>
+          {role === 'tenant' ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              accessibilityLabel="Sign out"
+              onPress={() => {
+                void signOut();
+                router.replace('/login');
+              }}>
+              <LogOut size={20} className="text-muted-foreground" />
+            </Button>
+          ) : null}
         </View>
 
         {/* Stats */}

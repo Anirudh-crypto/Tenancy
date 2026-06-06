@@ -1,5 +1,5 @@
 import { format, formatDistanceToNow } from 'date-fns';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft,
   BedDouble,
@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar, AvatarFallback, Badge, Card, CardContent, Separator, Text } from '@/components/ui';
 import { InviteTenantSection } from '@/components/InviteTenantSection';
+import { goBackTo } from '@/lib/navigation';
 import { useStore, SEED_PROPERTY_ID } from '@/lib/store';
 import type { PropertyTenant } from '@/lib/types';
 
@@ -150,9 +151,7 @@ export default function PropertyDetailScreen() {
               accessibilityLabel="Go back"
               hitSlop={12}
               className="min-h-[44px] min-w-[44px] justify-center"
-              onPress={() =>
-                router.canGoBack() ? router.back() : router.replace('/(tabs)')
-              }>
+              onPress={() => goBackTo('/(tabs)')}>
               <ArrowLeft size={22} className="text-foreground" />
             </Pressable>
           ),

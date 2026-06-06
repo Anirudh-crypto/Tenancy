@@ -1,4 +1,4 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft,
   Camera,
@@ -30,6 +30,7 @@ import {
   computeDepositRecommendation,
   roomLabel,
 } from '@/lib/ai';
+import { goBackTo } from '@/lib/navigation';
 import { useStore } from '@/lib/store';
 import type { DetectedDamage, RoomKey } from '@/lib/types';
 
@@ -103,7 +104,7 @@ export default function InspectionDetailScreen() {
           title: isMoveOut ? 'Move-out report' : 'Move-in report',
           headerLeft: () => (
             <Pressable
-              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/inspect'))}
+              onPress={() => goBackTo('/(tabs)/inspect')}
               hitSlop={12}
               accessibilityRole="button"
               accessibilityLabel="Go back"
