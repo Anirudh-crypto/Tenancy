@@ -1,8 +1,8 @@
 import { format, formatDistanceToNow, isPast } from 'date-fns';
-import { useLocalSearchParams } from 'expo-router';
-import { AlertTriangle, CheckCircle2, Gavel, Send } from 'lucide-react-native';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Gavel, Send } from 'lucide-react-native';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { StatusPill, UrgencyBadge } from '@/components/StatusBadges';
@@ -47,6 +47,21 @@ export default function TicketDetailScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
+      <Stack.Screen
+        options={{
+          title: 'Ticket',
+          headerLeft: () => (
+            <Pressable
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/tickets'))}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              className="min-h-[44px] min-w-[44px] flex-row items-center justify-center pr-2">
+              <ArrowLeft size={22} className="text-foreground" />
+            </Pressable>
+          ),
+        }}
+      />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router } from 'expo-router';
-import { Sparkles } from 'lucide-react-native';
+import { router, Stack } from 'expo-router';
+import { Sparkles, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
@@ -53,6 +53,21 @@ export default function NewTicketScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['bottom']}>
+      <Stack.Screen
+        options={{
+          title: 'Report an issue',
+          headerLeft: () => (
+            <Pressable
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/tickets'))}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              className="min-h-[44px] min-w-[44px] flex-row items-center justify-center pr-2">
+              <X size={22} className="text-foreground" />
+            </Pressable>
+          ),
+        }}
+      />
       <ScrollView contentContainerClassName="px-5 pb-10 pt-4" keyboardShouldPersistTaps="handled">
         <Text size="sm" variant="muted">
           Describe the problem. AI will categorize urgency and suggest legal timelines.
