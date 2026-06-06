@@ -22,6 +22,7 @@ import { DARK_THEME, LIGHT_THEME } from '@/lib/constants';
 import { initPostHog } from '@/lib/posthog';
 import { reportErrorToParent } from '@/lib/reportPreviewError';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useStore } from '@/lib/store';
 import { ToastProvider } from '@/components/ui/toast';
 
 import {
@@ -29,6 +30,8 @@ import {
   type ErrorBoundaryProps,
   SplashScreen,
   Stack,
+  useRouter,
+  useSegments,
 } from 'expo-router';
 
 /**
@@ -50,8 +53,31 @@ export { ErrorBoundary };
 // Prevent the splash screen from auto-hiding before getting the color scheme.
 void SplashScreen.preventAutoHideAsync();
 
+/**
+ * Redirects between the auth screens and the app depending on whether a user
+ * is signed in. Waits for the persisted store to hydrate before acting.
+ */
+function useProtectedRoute() {
+  const segments = useSegments();
+  const router = useRouter();
+  const user = useStore((s) => s.user);
+  const hydrated = useStore((s) => s.hydrated);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const inAuthGroup = segments[0] === 'login' || segments[0] === 'signup';
+
+    if (!user && !inAuthGroup) {
+      router.replace('/login');
+    } else if (user && inAuthGroup) {
+      router.replace('/(tabs)');
+    }
+  }, [user, hydrated, segments, router]);
+}
+
 export default function RootLayout() {
   const { colorScheme, setColorScheme } = useColorScheme();
+  useProtectedRoute();
 
   const [loaded, error] = useFonts({
     Inter_400Regular,
@@ -163,6 +189,8 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <ToastProvider>
             <Stack>
+              <Stack.Screen name="login" options={{ headerShown: false }} />
+              <Stack.Screen name="signup" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen
                 name="ticket/new"

@@ -4,16 +4,19 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { genId, triageTicket } from './ai';
 import type {
+  Account,
   DetectedDamage,
   Inspection,
   InspectionKind,
   InspectionPhoto,
   Property,
   RiskSignal,
+  Role,
   RoomKey,
   Ticket,
   TimelineEvent,
   TimelineType,
+  User,
 } from './types';
 
 function iso(daysAgo: number): string {
@@ -93,6 +96,23 @@ const SEED_RISKS: RiskSignal[] = [
   },
 ];
 
+const SEED_ACCOUNTS: Account[] = [
+  {
+    id: 'acc_tenant',
+    email: 'lena@tenant.de',
+    password: 'password',
+    name: 'Lena Hoffmann',
+    role: 'tenant',
+  },
+  {
+    id: 'acc_landlord',
+    email: 'becker@landlord.de',
+    password: 'password',
+    name: 'M. Becker Immobilien',
+    role: 'landlord',
+  },
+];
+
 interface State {
   property: Property;
   tickets: Ticket[];
@@ -101,6 +121,18 @@ interface State {
   risks: RiskSignal[];
   role: 'tenant' | 'landlord';
   hydrated: boolean;
+
+  accounts: Account[];
+  user: User | null;
+
+  signIn: (email: string, password: string) => { ok: true } | { ok: false; error: string };
+  signUp: (input: {
+    name: string;
+    email: string;
+    password: string;
+    role: Role;
+  }) => { ok: true } | { ok: false; error: string };
+  signOut: () => void;
 
   setRole: (r: 'tenant' | 'landlord') => void;
   addTicket: (input: { title: string; description: string }) => Ticket;
@@ -137,6 +169,44 @@ export const useStore = create<State>()(
       risks: SEED_RISKS,
       role: 'tenant',
       hydrated: false,
+
+      accounts: SEED_ACCOUNTS,
+      user: null,
+
+      signIn: (email, password) => {
+        const normalized = email.trim().toLowerCase();
+        const account = get().accounts.find((a) => a.email.toLowerCase() === normalized);
+        if (!account || account.password !== password) {
+          return { ok: false, error: 'Invalid email or password.' };
+        }
+        const { password: _pw, ...user } = account;
+        set({ user, role: account.role });
+        return { ok: true };
+      },
+
+      signUp: ({ name, email, password, role }) => {
+        const normalized = email.trim().toLowerCase();
+        if (!name.trim()) return { ok: false, error: 'Please enter your name.' };
+        if (!normalized.includes('@')) return { ok: false, error: 'Enter a valid email address.' };
+        if (password.length < 6) {
+          return { ok: false, error: 'Password must be at least 6 characters.' };
+        }
+        if (get().accounts.some((a) => a.email.toLowerCase() === normalized)) {
+          return { ok: false, error: 'An account with this email already exists.' };
+        }
+        const account: Account = {
+          id: genId('acc'),
+          email: normalized,
+          password,
+          name: name.trim(),
+          role,
+        };
+        const { password: _pw, ...user } = account;
+        set((s) => ({ accounts: [...s.accounts, account], user, role }));
+        return { ok: true };
+      },
+
+      signOut: () => set({ user: null }),
 
       setRole: (role) => set({ role }),
 
@@ -254,6 +324,8 @@ export const useStore = create<State>()(
         inspections: s.inspections,
         risks: s.risks,
         role: s.role,
+        accounts: s.accounts,
+        user: s.user,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setRole(state.role);
